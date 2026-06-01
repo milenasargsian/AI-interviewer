@@ -88,6 +88,23 @@ def chat_text(prompt, *, system=None, temperature=0.5, model=None):
     return resp.choices[0].message.content.strip()
 
 
+_LANG_NAMES = {"en": "English", "hy": "Armenian", "ru": "Russian"}
+
+
+def lang_directive(lang):
+    """A sentence telling the model which language to write human-facing text in.
+
+    JSON keys/structure stay as specified; only the *values* the candidate
+    reads (questions, feedback, narrative) are translated.
+    """
+    name = _LANG_NAMES.get(lang or "en", "English")
+    if name == "English":
+        return ""
+    return (f" Write ALL human-readable text values (questions, feedback, "
+            f"summaries, narrative) in {name}. Keep every JSON key exactly as "
+            f"specified in English.")
+
+
 def trim_cv(text):
     """Trim CV text to keep requests fast without losing the substance."""
     if not text:

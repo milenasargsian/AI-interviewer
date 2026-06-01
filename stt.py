@@ -1,8 +1,9 @@
-"""Speech-to-text using OpenAI Whisper.
+"""Speech-to-text using Groq Whisper.
 
 We transcribe audio recorded in the browser (via ``st.audio_input``) rather
 than reading a server-side microphone. This is accurate, works when the app
-is deployed, and avoids fragile PyAudio/driver issues on Windows.
+is deployed, and avoids fragile PyAudio/driver issues on Windows. Passing the
+``language`` (e.g. 'hy', 'ru', 'en') improves accuracy for that language.
 """
 
 import io

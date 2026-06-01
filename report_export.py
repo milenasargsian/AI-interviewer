@@ -54,9 +54,14 @@ def build_pdf(report):
     flow.append(Spacer(1, 6))
 
     flow.append(Paragraph("Overall Result", styles["H2c"]))
+    auth = report.get("authenticity_overall", "N/A")
+    ai_avg = report.get("avg_ai_likelihood")
+    auth_line = esc(auth) + (f" (avg AI-likelihood {ai_avg}/100)" if ai_avg is not None else "")
     flow.append(Paragraph(
         f"<b>Overall interview score:</b> {report['overall_score']}/10<br/>"
+        f"<b>Grade:</b> {esc(report.get('grade', 'N/A'))}<br/>"
         f"<b>Recommendation:</b> {esc(report['recommendation'])}<br/>"
+        f"<b>Answer authenticity:</b> {auth_line}<br/>"
         f"<b>CV–Role match:</b> {report['match_score']}%", styles["Body"]))
 
     # Narrative: convert simple Markdown to paragraphs.
@@ -79,6 +84,10 @@ def build_pdf(report):
         flow.append(Paragraph(f"<b>Answer:</b> {esc(p['answer'])}", styles["Body"]))
         if crit:
             flow.append(Paragraph(f"<b>Criteria:</b> {esc(crit)}", styles["Body"]))
+        auth_v = p.get("authenticity_verdict", "N/A")
+        ai_l = p.get("ai_likelihood")
+        auth_v = auth_v + (f" (AI-likelihood {ai_l}/100)" if ai_l is not None else "")
+        flow.append(Paragraph(f"<b>Authenticity:</b> {esc(auth_v)}", styles["Body"]))
         flow.append(Paragraph(f"<b>Strengths:</b> {esc('; '.join(p['strengths']) or '—')}", styles["Body"]))
         flow.append(Paragraph(f"<b>Weaknesses:</b> {esc('; '.join(p['weaknesses']) or '—')}", styles["Body"]))
         flow.append(Paragraph(f"<b>How to improve:</b> {esc('; '.join(p['improvements']) or '—')}", styles["Body"]))
@@ -110,8 +119,16 @@ def build_docx(report):
     p = document.add_paragraph()
     p.add_run("Overall interview score: ").bold = True
     p.add_run(f"{report['overall_score']}/10\n")
+    p.add_run("Grade: ").bold = True
+    p.add_run(f"{report.get('grade', 'N/A')}\n")
     p.add_run("Recommendation: ").bold = True
     p.add_run(f"{report['recommendation']}\n")
+    p.add_run("Answer authenticity: ").bold = True
+    ai_avg = report.get("avg_ai_likelihood")
+    auth_line = report.get("authenticity_overall", "N/A")
+    if ai_avg is not None:
+        auth_line += f" (avg AI-likelihood {ai_avg}/100)"
+    p.add_run(f"{auth_line}\n")
     p.add_run("CV–Role match: ").bold = True
     p.add_run(f"{report['match_score']}%")
 
@@ -127,9 +144,14 @@ def build_docx(report):
     for p in report["per_question"]:
         document.add_heading(
             f"Q{p['index']} [{p['category']}] — {p['score']}/10", level=2)
+        _ai_l = p.get("ai_likelihood")
+        _auth = p.get("authenticity_verdict", "N/A")
+        if _ai_l is not None:
+            _auth += f" (AI-likelihood {_ai_l}/100)"
         for label, value in [
             ("Question", p["question"]),
             ("Answer", p["answer"]),
+            ("Authenticity", _auth),
             ("Strengths", "; ".join(p["strengths"]) or "—"),
             ("Weaknesses", "; ".join(p["weaknesses"]) or "—"),
             ("How to improve", "; ".join(p["improvements"]) or "—"),
