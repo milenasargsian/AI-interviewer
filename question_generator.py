@@ -44,6 +44,15 @@ def generate_questions(cv_analysis, job_direction, context=None,
 
     seniority = cv_analysis.get("seniority_level", "Mid-level")
     has_project = bool(project_summary)
+    interview_desc = context.get("interview_desc", "")
+    persona = context.get("persona", "candidate")
+    transferable = ", ".join(cv_analysis.get("transferable_skills", [])) or "N/A"
+    persona_line = (
+        "AUDIENCE: the CANDIDATE is practising — phrase questions like a real "
+        "interviewer would, at a fair level for preparation."
+        if persona == "candidate" else
+        "AUDIENCE: a RECRUITER is screening this candidate — questions should "
+        "expose real signal for a hire/no-hire decision.")
 
     prompt = f"""Design a {num_questions}-question interview PLAN for this candidate.
 
@@ -62,11 +71,18 @@ INTERVIEW CONTEXT
 - Specific company: {company}
 - Desired focus: {focus}
 - Extra context from the user (treat as important): {extra_context}
+- Interview description in the user's own words (honour tone & scope): {interview_desc or 'None'}
+- Transferable skills (use these if the background is a stretch): {transferable}
+- Fit note: {cv_analysis.get('fit_note', 'N/A')}
+{persona_line}
 {_jd_block(context)}
 CANDIDATE'S SUBMITTED PROJECT (ask grounded questions about it if present):
 {project_brief(project_summary)}
 
 REQUIREMENTS
+- If the CV is an imperfect match for the role, do NOT bail out: build a fair
+  transition/stretch interview that leans on transferable skills and motivation,
+  while still honestly testing the role's core requirements.
 - Calibrate difficulty to the seniority level ({seniority}).
 - BALANCE the interview across these categories: {', '.join(CATEGORIES)}.
   Do NOT spend the whole interview on one topic.

@@ -15,8 +15,13 @@ _SYSTEM = (
 )
 
 
-def analyze_cv(cv_text, job_direction, jd_text="", interview_lang="en"):
-    """Analyse a CV and return a structured, normalised profile."""
+def analyze_cv(cv_text, job_direction, jd_text="", interview_lang="en",
+               interview_desc="", persona="candidate"):
+    """Analyse a CV and return a structured, normalised profile.
+
+    Robust to CV/role mismatch: instead of failing, it identifies transferable
+    skills and frames the interview as a realistic transition/stretch case.
+    """
 
     header_lines = get_header_lines(cv_text)
     trimmed = trim_cv(cv_text)
@@ -28,9 +33,19 @@ TARGET JOB DESCRIPTION (match the candidate against THIS, not just the title):
 {jd_text.strip()[:4000]}
 """
 
+    desc_block = ""
+    if interview_desc and interview_desc.strip():
+        desc_block = (f"\nINTERVIEW DESCRIPTION FROM THE USER (honour this framing "
+                      f"when judging fit and tone):\n{interview_desc.strip()[:1500]}\n")
+
     prompt = f"""Analyse the following CV for a candidate targeting the job
 direction: "{job_direction}".
-{jd_block}
+{jd_block}{desc_block}
+IMPORTANT — handle imperfect fit gracefully. If the CV does NOT closely match
+the target role, do NOT refuse or just declare a mismatch. Instead: give an
+honest match_score, identify TRANSFERABLE skills, and treat it as a realistic
+career-transition / stretch interview. Always produce a usable analysis.
+
 Use ONLY evidence present in the CV. The candidate's name normally appears
 in the first lines (the header). Extract it exactly as written; do not
 translate, abbreviate or reorder it.
@@ -54,6 +69,8 @@ Return a JSON object with EXACTLY these keys:
   "key_skills": ["the 6-10 most relevant skills/tools actually shown in the CV"],
   "strengths": ["4-6 concrete strengths for the target role, each citing CV evidence"],
   "gaps": ["3-5 specific gaps or risks for the target role{' versus the JD requirements' if jd_block else ''}"],
+  "transferable_skills": ["3-6 skills from the CV that transfer to the target role, even if the background differs"],
+  "fit_note": "1-2 sentences: how strong the fit is and, if it's a transition/stretch, how to frame the interview fairly",
   "jd_requirements": [{'"the key requirements parsed from the JD" ' if jd_block else ''}],
   "summary": "a concise 2-3 sentence professional summary of the candidate"
 }}
@@ -70,6 +87,7 @@ Be specific and realistic. Avoid vague or generic titles.{lang_directive(intervi
             "years_of_experience": 0, "match_score": 0,
             "match_rationale": f"Analysis failed: {err}",
             "key_skills": [], "strengths": [], "gaps": [],
+            "transferable_skills": [], "fit_note": "",
             "jd_requirements": [], "summary": "",
         }
 
@@ -91,12 +109,14 @@ Be specific and realistic. Avoid vague or generic titles.{lang_directive(intervi
         data["match_score"] = max(0, min(100, int(round(float(data.get("match_score", 0))))))
     except (TypeError, ValueError):
         data["match_score"] = 0
-    for key in ("key_skills", "strengths", "gaps", "jd_requirements"):
+    for key in ("key_skills", "strengths", "gaps", "jd_requirements",
+                "transferable_skills"):
         if not isinstance(data.get(key), list):
             data[key] = []
     data.setdefault("seniority_level", "N/A")
     data.setdefault("target_role", job_direction)
     data.setdefault("summary", "")
     data.setdefault("match_rationale", "")
+    data.setdefault("fit_note", "")
 
     return data

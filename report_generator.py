@@ -53,7 +53,7 @@ def _letter_grade(avg_10):
 
 
 def generate_report(cv_analysis, questions, answers, scores, job_direction,
-                    context=None, interview_lang="en"):
+                    context=None, interview_lang="en", persona="candidate"):
     """Build a structured report dict (consumed by report_export)."""
     context = context or {}
 
@@ -88,7 +88,7 @@ def generate_report(cv_analysis, questions, answers, scores, job_direction,
             "index": i + 1,
             "category": q.get("category", "") if isinstance(q, dict) else "",
             "question": q_text,
-            "answer": answers[i],
+            "answer": answers[i] if answers[i] else "(skipped)",
             "score": s.get("score", 0),
             "criteria": s.get("criteria", {}),
             "strengths": s.get("strengths", []),
@@ -110,7 +110,20 @@ def generate_report(cv_analysis, questions, answers, scores, job_direction,
         for p in per_question
     )
 
+    if persona == "candidate":
+        audience_line = ("AUDIENCE: the candidate themselves, preparing for a real "
+                         "interview. Be a supportive but honest COACH: encourage, "
+                         "and give concrete prep advice for next time.")
+        rec_heading = ("## Readiness & Next Steps  (how ready they are, and a short "
+                       "prioritised prep plan)")
+    else:
+        audience_line = ("AUDIENCE: a recruiter making a selection decision. Be "
+                         "objective and decisive; focus on signal relevant to hiring.")
+        rec_heading = "## Hiring Recommendation  (state the recommendation and grade, and justify it)"
+
     narrative_prompt = f"""Write the narrative section of a final interview report.
+
+{audience_line}
 
 Candidate: {cv_analysis.get('full_name', 'Candidate')}
 Target role: {cv_analysis.get('target_role')}
@@ -129,7 +142,7 @@ Write in Markdown with these sections:
 ## Key Strengths Demonstrated  (bullet list, evidence-based)
 ## Areas for Improvement  (bullet list, specific and actionable)
 ## Authenticity Assessment  (2-3 sentences on how genuine/personal the answers were, and any AI-generated concerns)
-## Hiring Recommendation  (state the recommendation and grade, and justify it)
+{rec_heading}
 ## Final Verdict  (one decisive paragraph)
 
 Be concrete and reference the candidate's actual answers.{lang_directive(interview_lang)}"""

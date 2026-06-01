@@ -4,7 +4,8 @@ Also flags answers that read as AI-generated / inauthentic vs. natural and
 personal, since a real interview rewards genuine, first-hand responses.
 """
 
-from llm_client import chat_json, lang_directive
+from llm_client import chat_json, chat_text, lang_directive
+from ai_detector import blend
 
 _SYSTEM = (
     "You are a rigorous, fair interview evaluator. You score answers against "
@@ -43,24 +44,36 @@ QUESTION:
 CANDIDATE'S ANSWER:
 {answer}
 
-PART 1 — QUALITY. Score each criterion 0-10 and justify with specifics:
-- relevance: did it actually address the question?
-- technical_accuracy: is the content correct and sound?
-- clarity: structure and communication (e.g. STAR for behavioural).
-- depth: concrete detail, reasoning, trade-offs, ownership.
+PART 1 — QUALITY. Score each criterion 0-10 using this OBJECTIVE anchored scale,
+and justify each with a direct reference to the answer's content:
+  0-2  = absent / wrong / off-topic
+  3-4  = vague or generic; little substance
+  5-6  = adequate; addresses the question but shallow or with gaps
+  7-8  = strong; correct, specific, well-reasoned
+  9-10 = excellent; precise, deep, with trade-offs and concrete evidence
+Criteria:
+- relevance: did it actually address THIS question?
+- technical_accuracy: is the content correct and sound? (penalise factual errors)
+- clarity: structure and communication (reward STAR for behavioural answers).
+- depth: concrete detail, reasoning, trade-offs, ownership, real numbers.
+Calibrate expectations to the stated seniority. Do not inflate: a generic answer
+with no specifics cannot score above 5 on depth. Score only what is written —
+never assume unstated knowledge.
 
-PART 2 — AUTHENTICITY. Judge whether the answer sounds like a real person
-speaking from first-hand experience versus generic, templated, or
-AI-generated text. Signals of authenticity: specific personal details, real
-project/tool names, natural spoken rhythm, minor imperfections, concrete
-numbers, "I" ownership. Signals of AI/inauthentic: vague universal claims,
-polished list-like structure, buzzword stacking, no personal specifics,
-textbook phrasing.
-- authenticity_score: 0-100 (100 = clearly genuine and personal)
-- ai_likelihood: 0-100 (100 = very likely AI-generated/templated)
-- authenticity_verdict: one of "Authentic", "Mostly authentic",
-  "Possibly AI-assisted", "Likely AI-generated"
-- authenticity_signals: 1-3 short observations supporting the verdict
+PART 2 — AUTHENTICITY (AI-generated detection). Assess whether the answer reads
+as a real person speaking from first-hand experience vs. generic/templated/
+AI-generated text. Weigh concrete evidence, not surface polish alone:
+  AUTHENTIC signals: specific personal details; real project/tool/company names;
+    natural spoken rhythm and self-correction; concrete numbers/outcomes; first-
+    person ownership ("I decided…"); honest uncertainty.
+  AI/INAUTHENTIC signals: vague universal claims; suspiciously even, list-like
+    structure; buzzword stacking; zero personal specifics; textbook phrasing;
+    over-formal tone for a spoken answer; covers everything but commits to nothing.
+Map ai_likelihood to the verdict CONSISTENTLY using these bands:
+  0-24 -> "Authentic", 25-49 -> "Mostly authentic",
+  50-74 -> "Possibly AI-assisted", 75-100 -> "Likely AI-generated".
+Set authenticity_score = 100 - ai_likelihood. A short but clearly personal
+answer is authentic; a long polished one with no specifics is suspicious.
 
 The overall "score" must be the average of the four QUALITY criteria, rounded
 to one decimal, on a 0-10 scale (authenticity does NOT change this number; it
@@ -82,14 +95,15 @@ Return a JSON object:
 Return ONLY the JSON object.{lang_directive(interview_lang)}"""
 
     try:
-        data = chat_json(prompt, system=_SYSTEM, temperature=0.2)
+        # temperature=0 -> deterministic, consistent, reproducible scoring.
+        data = chat_json(prompt, system=_SYSTEM, temperature=0.0)
     except Exception as err:
         return _empty(f"Could not evaluate answer: {err}")
 
-    return _normalise(data)
+    return _normalise(data, answer)
 
 
-def _normalise(data):
+def _normalise(data, answer=""):
     crit = data.get("criteria") or {}
     norm_crit = {}
     for key in ("relevance", "technical_accuracy", "clarity", "depth"):
@@ -103,10 +117,12 @@ def _normalise(data):
         if not isinstance(data.get(key), list):
             data[key] = []
 
-    verdict = data.get("authenticity_verdict", "Mostly authentic")
-    if verdict not in {"Authentic", "Mostly authentic",
-                       "Possibly AI-assisted", "Likely AI-generated"}:
-        verdict = "Mostly authentic"
+    # --- Hybrid AI-detection: blend the model's judgement with local
+    # stylometric signals for a far more reliable, consistent verdict. ---
+    llm_ai = _clamp100(data.get("ai_likelihood", 50))
+    ai, heur_signals = blend(llm_ai, answer)
+    verdict = _verdict_from_ai(ai)
+    authenticity = 100 - ai
 
     return {
         "score": overall,
@@ -115,11 +131,23 @@ def _normalise(data):
         "weaknesses": data.get("weaknesses", []),
         "improvements": data.get("improvements", []),
         "feedback": data.get("feedback", ""),
-        "authenticity_score": _clamp100(data.get("authenticity_score", 70)),
-        "ai_likelihood": _clamp100(data.get("ai_likelihood", 30)),
+        "authenticity_score": authenticity,
+        "ai_likelihood": ai,
+        "ai_likelihood_llm": llm_ai,
+        "ai_signals": heur_signals,
         "authenticity_verdict": verdict,
         "authenticity_signals": data.get("authenticity_signals", []),
     }
+
+
+def _verdict_from_ai(ai_likelihood):
+    if ai_likelihood >= 75:
+        return "Likely AI-generated"
+    if ai_likelihood >= 50:
+        return "Possibly AI-assisted"
+    if ai_likelihood >= 25:
+        return "Mostly authentic"
+    return "Authentic"
 
 
 def _clamp10(value):
@@ -146,6 +174,52 @@ def _empty(message):
         "feedback": message,
         "authenticity_score": 0,
         "ai_likelihood": 0,
+        "ai_likelihood_llm": 0,
+        "ai_signals": {},
         "authenticity_verdict": "N/A",
         "authenticity_signals": [],
     }
+
+
+_MODEL_SYSTEM = (
+    "You are an expert interview coach. You write exemplary spoken answers that "
+    "a strong candidate could realistically give — specific, structured and "
+    "natural, never generic filler."
+)
+
+
+def model_answer(question, job_direction, cv_analysis=None, context=None,
+                 interview_lang="en"):
+    """Generate a 'best possible answer' to a question, for coaching.
+
+    Returns markdown: a concise model answer plus why it works. Grounded in
+    the candidate's real background so it is attainable, not generic.
+    """
+    cv_analysis = cv_analysis or {}
+    context = context or {}
+    role = cv_analysis.get("target_role", job_direction)
+
+    prompt = f"""Write the BEST realistic answer a strong candidate could give to
+this interview question, as a model for someone preparing.
+
+ROLE: {role} ({cv_analysis.get('seniority_level', 'Mid-level')})
+CANDIDATE BACKGROUND (ground the answer in this so it is attainable):
+- Key skills: {', '.join(cv_analysis.get('key_skills', [])) or 'N/A'}
+- Strengths: {', '.join(cv_analysis.get('strengths', [])) or 'N/A'}
+
+QUESTION:
+{question}
+
+Write in Markdown:
+**Model answer:** a concise, natural spoken answer (use STAR for behavioural
+questions; show reasoning/trade-offs for technical or problem-solving ones).
+Keep it realistic — about 120-200 words, first person, with concrete specifics.
+
+**Why it works:** 2-3 short bullets on what makes this answer strong.
+
+Do not be generic or stuff buzzwords.{lang_directive(interview_lang)}"""
+
+    try:
+        return chat_text(prompt, system=_MODEL_SYSTEM, temperature=0.4)
+    except Exception as err:
+        return f"_Could not generate a model answer ({err})._"

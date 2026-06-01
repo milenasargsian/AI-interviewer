@@ -15,7 +15,7 @@ from cv_parser import extract_text_from_pdf
 from cv_analyzer import analyze_cv
 from question_generator import (generate_questions, generate_followup,
                                 adapt_difficulty, DIFFICULTY_LADDER)
-from scorer import score_answer
+from scorer import score_answer, model_answer
 from report_generator import generate_report, report_to_markdown
 from stt import transcribe_audio_bytes
 from project_analyzer import extract_project_text, summarize_project
@@ -44,12 +44,12 @@ CUSTOM_CSS = (
 "h1,h2,h3,h4{font-family:'Sora','Inter',sans-serif;color:var(--ink);letter-spacing:-.01em;}"
 ".hero{position:relative;overflow:hidden;background:linear-gradient(125deg,#4F46E5 0%,#6366F1 42%,#8B5CF6 100%);padding:2.4rem 2.6rem;border-radius:24px;color:#fff;margin-bottom:1.6rem;box-shadow:var(--shadow-lg);}"
 ".hero::after{content:'';position:absolute;inset:0;background:radial-gradient(420px 200px at 88% -20%,rgba(255,255,255,.28),transparent 70%),radial-gradient(360px 220px at 8% 120%,rgba(255,255,255,.16),transparent 70%);pointer-events:none;}"
-".hero h1{margin:0;font-size:2.35rem;font-weight:800;color:#fff;}"
-".hero p{margin:.5rem 0 0;opacity:.92;font-size:1.06rem;max-width:760px;line-height:1.55;}"
+".hero h1{margin:0;font-size:1.85rem;font-weight:800;color:#fff;}"
+".hero p{margin:.45rem 0 0;opacity:.92;font-size:.98rem;max-width:780px;line-height:1.5;}"
 ".hero .pill{display:inline-block;margin-top:1rem;margin-right:.5rem;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);color:#fff;padding:.32rem .8rem;border-radius:999px;font-size:.78rem;font-weight:600;}"
 ".card{background:var(--surface);padding:1.5rem 1.7rem;border-radius:var(--radius);box-shadow:var(--shadow-md);border:1px solid var(--line);margin-bottom:1rem;transition:transform .18s ease,box-shadow .18s ease;}"
 ".card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}"
-".question-box{background:linear-gradient(180deg,#fff,#FBFAFF);padding:1.6rem 1.8rem;border-radius:var(--radius);border:1px solid var(--indigo-100);border-left:5px solid var(--indigo-500);margin:.6rem 0 1.1rem;font-size:1.16rem;line-height:1.6;color:var(--ink);box-shadow:var(--shadow-sm);font-weight:500;}"
+".question-box{background:linear-gradient(180deg,#fff,#FBFAFF);padding:1.3rem 1.5rem;border-radius:var(--radius);border:1px solid var(--indigo-100);border-left:5px solid var(--indigo-500);margin:.6rem 0 1.1rem;font-size:1.02rem;line-height:1.55;color:var(--ink);box-shadow:var(--shadow-sm);font-weight:500;word-break:break-word;}"
 ".answer-box{background:var(--success-bg);padding:1.15rem 1.5rem;border-radius:14px;border:1px solid #C7F0DD;border-left:5px solid var(--success);margin:.5rem 0;white-space:pre-wrap;color:#0B3B2E;line-height:1.6;}"
 ".badge{display:inline-block;padding:.24rem .8rem;border-radius:999px;font-size:.74rem;font-weight:700;margin-right:.45rem;letter-spacing:.02em;border:1px solid transparent;}"
 ".badge-cat{background:var(--indigo-50);color:var(--indigo-700);border-color:var(--indigo-100);}"
@@ -68,7 +68,7 @@ CUSTOM_CSS = (
 ".stTextInput input,.stTextArea textarea,.stSelectbox div[data-baseweb=\"select\"]{border-radius:12px !important;}"
 ".stTextInput input:focus,.stTextArea textarea:focus{border-color:var(--indigo-500) !important;box-shadow:0 0 0 3px rgba(99,102,241,.15) !important;}"
 "[data-testid=\"stMetric\"]{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:1rem 1.1rem;box-shadow:var(--shadow-sm);}"
-"[data-testid=\"stMetricValue\"]{color:var(--indigo-700);font-family:'Sora',sans-serif;font-weight:700;}"
+"[data-testid=\"stMetricValue\"]{color:var(--indigo-700);font-family:'Sora',sans-serif;font-weight:700;font-size:1.45rem;line-height:1.2;word-break:break-word;}"
 "[data-testid=\"stMetricLabel\"]{color:var(--slate-600);font-weight:600;}"
 ".stProgress > div > div > div{background:linear-gradient(90deg,var(--indigo-500),var(--violet-500)) !important;}"
 "section[data-testid=\"stSidebar\"]{background:linear-gradient(180deg,#FFFFFF 0%,#FBFAFF 100%);border-right:1px solid var(--line);}"
@@ -93,7 +93,7 @@ def init_state():
         "project_summary": None, "adaptive": True,
         "ui_lang": "en", "interview_lang": "en", "auto_read": False,
         "jd_text": "", "difficulty_level": 1, "app_mode": "new",
-        "report_saved": False,
+        "report_saved": False, "persona": "candidate",
     }
     for k, v in defaults.items():
         st.session_state.setdefault(k, v)
@@ -112,6 +112,23 @@ def stepper():
         active = "active" if st.session_state.stage == key else ""
         pills += f'<span class="step-pill {active}">{label}</span>'
     st.markdown(pills, unsafe_allow_html=True)
+
+
+def info_card(label, value, sub=""):
+    """A metric-style card whose value WRAPS (unlike st.metric, which clips).
+
+    Use for long text values like role titles so words are never cut with '…'.
+    """
+    sub_html = (f"<div style='font-size:.76rem;color:#94A3B8;margin-top:.3rem'>{sub}</div>"
+                if sub else "")
+    st.markdown(
+        f"<div style='background:#fff;border:1px solid #E7EAF3;border-radius:16px;"
+        f"padding:.85rem 1rem;box-shadow:0 1px 2px rgba(15,23,42,.06)'>"
+        f"<div style='font-size:.78rem;color:#475569;font-weight:600'>{label}</div>"
+        f"<div style='font-family:Sora,sans-serif;font-weight:700;color:#4338CA;"
+        f"font-size:1.05rem;line-height:1.3;margin-top:.2rem;word-break:break-word;"
+        f"white-space:normal'>{value}</div>{sub_html}</div>",
+        unsafe_allow_html=True)
 
 
 def play_tts(text):
@@ -180,11 +197,14 @@ def upload_stage():
 
     adaptive = st.checkbox(t("adaptive_cb"), value=True)
 
-    jd_text = st.text_area(t("jd_label"), value=st.session_state.jd_text, height=120,
+    interview_desc = st.text_area(
+        t("interview_desc"), value=st.session_state.context.get("interview_desc", ""),
+        height=90, placeholder=t("interview_desc_ph"))
+    jd_text = st.text_area(t("jd_label"), value=st.session_state.jd_text, height=110,
                            placeholder="Paste the full job posting here…")
     extra_context = st.text_area(
         t("extra_context"), value=st.session_state.context.get("extra_context", ""),
-        height=90,
+        height=80,
         placeholder="e.g. Second interview — already submitted a payments project; go deeper.")
 
     u1, u2 = st.columns(2)
@@ -226,6 +246,8 @@ def upload_stage():
                     "company": company.strip(), "interview_focus": interview_focus,
                     "extra_context": extra_context.strip(),
                     "jd_text": jd_text.strip(),
+                    "interview_desc": interview_desc.strip(),
+                    "persona": st.session_state.persona,
                 }
 
                 st.session_state.project_summary = None
@@ -239,7 +261,9 @@ def upload_stage():
                 with st.spinner("Analyzing CV with AI…"):
                     st.session_state.cv_analysis = analyze_cv(
                         cv_text, job_direction.strip(),
-                        jd_text=jd_text.strip(), interview_lang=interview_lang)
+                        jd_text=jd_text.strip(), interview_lang=interview_lang,
+                        interview_desc=interview_desc.strip(),
+                        persona=st.session_state.persona)
                 st.session_state.stage = "analysis"
                 persist()
                 st.rerun()
@@ -272,14 +296,22 @@ def analysis_stage():
                     f"<p style='margin:.3rem 0 0;color:#555'>{a.get('summary','')}</p></div>",
                     unsafe_allow_html=True)
     with top[1]:
-        st.metric(t("target_role"), a.get("target_role", "N/A"))
-        st.caption(f"{a.get('seniority_level','N/A')} · ~{a.get('years_of_experience',0)} yrs")
+        info_card(t("target_role"), a.get("target_role", "N/A"),
+                  sub=f"{a.get('seniority_level','N/A')} · "
+                      f"~{a.get('years_of_experience',0)} yrs")
     with top[2]:
         st.metric(t("cv_match"), f"{a.get('match_score',0)}%")
         st.progress(min(100, int(a.get("match_score", 0))) / 100)
 
     if a.get("match_rationale"):
         st.info(f"**{t('why_match')}:** {a['match_rationale']}")
+
+    # Mismatch-friendly framing: show how a stretch/transition is handled.
+    if a.get("fit_note"):
+        st.warning(f"🧭 {a['fit_note']}")
+    if a.get("transferable_skills"):
+        st.markdown("**🔁 Transferable skills:** "
+                    + ", ".join(a["transferable_skills"]))
 
     if a.get("jd_requirements"):
         with st.expander("📋 Parsed job-description requirements"):
@@ -398,10 +430,25 @@ def _answer_panel(idx, q):
 
     st.text_area(t("your_answer"), key=answer_key, height=170)
 
-    if st.button(t("submit"), type="primary", key=f"submit_{idx}"):
+    b1, b2 = st.columns([3, 1])
+    submit = b1.button(t("submit"), type="primary", key=f"submit_{idx}",
+                       use_container_width=True)
+    skip = b2.button(t("skip"), key=f"skip_{idx}", use_container_width=True)
+
+    if skip:
+        st.session_state.answers.append("")
+        st.session_state.scores.append(_skipped_score())
+        if st.session_state.adaptive:
+            recent = [s.get("score", 0) for s in st.session_state.scores]
+            st.session_state.difficulty_level = adapt_difficulty(
+                st.session_state.difficulty_level, recent)
+        persist()
+        st.rerun()
+
+    if submit:
         final_answer = st.session_state.get(answer_key, "").strip()
         if not final_answer:
-            st.warning("Please provide an answer before submitting.")
+            st.warning("Please provide an answer, or use Skip.")
             return
         with st.spinner("Evaluating…"):
             score = score_answer(
@@ -420,6 +467,19 @@ def _answer_panel(idx, q):
         st.rerun()
 
 
+def _skipped_score():
+    """A zero score record for a skipped question."""
+    return {
+        "score": 0,
+        "criteria": {"relevance": 0, "technical_accuracy": 0, "clarity": 0, "depth": 0},
+        "strengths": [], "weaknesses": ["Question was skipped — no answer given."],
+        "improvements": ["Attempt every question; even a partial answer scores higher than 0."],
+        "feedback": t("skipped"),
+        "authenticity_score": 0, "ai_likelihood": 0,
+        "authenticity_verdict": "N/A", "authenticity_signals": [], "skipped": True,
+    }
+
+
 def _auth_badge(verdict):
     cls = "badge-auth-good"
     if verdict == "Possibly AI-assisted":
@@ -429,23 +489,73 @@ def _auth_badge(verdict):
     return f"<span class='badge {cls}'>🔍 {verdict}</span>"
 
 
+def _ai_detection_panel(score):
+    """Visual AI-answer detection: verdict badge + gauge bar + signals."""
+    verdict = score.get("authenticity_verdict", "N/A")
+    ai = int(score.get("ai_likelihood", 0))
+    # Gauge colour by risk.
+    if ai >= 75:
+        bar = "#EF4444"
+    elif ai >= 50:
+        bar = "#F59E0B"
+    elif ai >= 25:
+        bar = "#84CC16"
+    else:
+        bar = "#10B981"
+    st.markdown(
+        f"<div style='background:#fff;border:1px solid var(--line,#E7EAF3);"
+        f"border-radius:14px;padding:.8rem 1rem;margin:.3rem 0 .6rem'>"
+        f"<div style='display:flex;justify-content:space-between;align-items:center;"
+        f"flex-wrap:wrap;gap:.4rem;margin-bottom:.5rem'>"
+        f"<span style='font-weight:700;font-size:.9rem;color:#475569'>🔍 {t('ai_detection')}</span>"
+        f"{_auth_badge(verdict)}</div>"
+        f"<div style='background:#EEF0F5;border-radius:999px;height:10px;overflow:hidden'>"
+        f"<div style='width:{ai}%;height:100%;background:{bar};border-radius:999px'></div></div>"
+        f"<div style='display:flex;justify-content:space-between;font-size:.74rem;"
+        f"color:#94A3B8;margin-top:.25rem'>"
+        f"<span>Authentic ({score.get('authenticity_score',0)}/100)</span>"
+        f"<span>AI-likelihood {ai}/100</span></div></div>",
+        unsafe_allow_html=True)
+    sigs = score.get("authenticity_signals", [])
+    if sigs:
+        with st.expander("Why this verdict?"):
+            for s in sigs:
+                st.caption(f"• {s}")
+            heur = score.get("ai_signals", {})
+            if heur:
+                st.caption("Stylometric signals: " + ", ".join(
+                    f"{k}={v}" for k, v in heur.items()))
+
+
 def _evaluation_panel(idx, q, total):
     answer = st.session_state.answers[idx]
     score = st.session_state.scores[idx]
+
+    if score.get("skipped"):
+        st.markdown(f"#### {t('your_answer_h')}")
+        st.warning(f"⏭ {t('skipped')}")
+        st.divider()
+        if idx == total - 1:
+            if st.button(t("finish"), type="primary", key=f"finish_{idx}"):
+                st.session_state.current_question_idx = idx + 1
+                st.session_state.report = None
+                st.session_state.report_saved = False
+                st.session_state.stage = "report"
+                persist()
+                st.rerun()
+        elif st.button(t("next_question"), type="primary", key=f"next_{idx}"):
+            _advance_to_next(idx)
+            persist()
+            st.rerun()
+        return
 
     st.markdown(f"#### {t('your_answer_h')}")
     st.markdown(f"<div class='answer-box'>{answer}</div>", unsafe_allow_html=True)
 
     verdict = score.get("authenticity_verdict", "N/A")
     ai_like = score.get("ai_likelihood")
-    if verdict and verdict != "N/A":
-        line = _auth_badge(verdict)
-        if ai_like is not None:
-            line += (f" &nbsp;<span style='color:#777'>AI-likelihood: {ai_like}/100 · "
-                     f"Authenticity: {score.get('authenticity_score',0)}/100</span>")
-        st.markdown(line, unsafe_allow_html=True)
-        for sig in score.get("authenticity_signals", []):
-            st.caption(f"• {sig}")
+    if verdict and verdict != "N/A" and ai_like is not None:
+        _ai_detection_panel(score)
 
     st.markdown(f"#### {t('evaluation')} — **{score.get('score',0)}/10**")
     crit = score.get("criteria", {})
@@ -460,16 +570,30 @@ def _evaluation_panel(idx, q, total):
         for s in score.get("strengths", []) or ["—"]:
             st.markdown(f"- {s}")
     with cols[1]:
-        st.markdown("**⚠️ Weaknesses**")
+        st.markdown(f"**{t('weaknesses')}**")
         for w in score.get("weaknesses", []) or ["—"]:
             st.markdown(f"- {w}")
     with cols[2]:
-        st.markdown("**🚀 How to improve**")
+        st.markdown(f"**{t('improve')}**")
         for i in score.get("improvements", []) or ["—"]:
             st.markdown(f"- {i}")
 
     if score.get("feedback"):
         st.info(score["feedback"])
+
+    # Best possible answer (coaching). Generated on demand and cached.
+    best_key = f"best_{idx}"
+    if st.button(t("show_best"), key=f"showbest_{idx}"):
+        if best_key not in st.session_state:
+            with st.spinner("Crafting the best possible answer…"):
+                st.session_state[best_key] = model_answer(
+                    q.get("question", ""), st.session_state.job_direction,
+                    cv_analysis=st.session_state.cv_analysis,
+                    context=st.session_state.context,
+                    interview_lang=st.session_state.interview_lang)
+    if best_key in st.session_state:
+        st.markdown(f"##### {t('best_answer')}")
+        st.success(st.session_state[best_key])
 
     if st.session_state.adaptive:
         st.caption(f"🎚 Next difficulty: "
@@ -520,7 +644,8 @@ def _previous_answers(idx):
         sc = st.session_state.scores[i] if i < len(st.session_state.scores) else {}
         with st.expander(f"Q{i+1} [{q.get('category','')}] — {sc.get('score',0)}/10"):
             st.markdown(f"**Q:** {q.get('question','')}")
-            st.markdown(f"**A:** {st.session_state.answers[i]}")
+            ans = st.session_state.answers[i]
+            st.markdown(f"**A:** {ans if ans else '_(skipped)_'}")
             if sc.get("feedback"):
                 st.caption(sc["feedback"])
 
@@ -544,7 +669,8 @@ def report_stage():
                 st.session_state.cv_analysis, st.session_state.questions,
                 st.session_state.answers, st.session_state.scores,
                 st.session_state.job_direction, context=st.session_state.context,
-                interview_lang=st.session_state.interview_lang)
+                interview_lang=st.session_state.interview_lang,
+                persona=st.session_state.persona)
 
     report = st.session_state.report
 
@@ -567,23 +693,26 @@ def report_stage():
         f"padding:1.5rem 1.8rem;border-radius:20px;margin:.4rem 0 1.2rem;"
         f"box-shadow:0 14px 34px rgba(16,185,129,.22);display:flex;"
         f"justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem'>"
-        f"<div><div style='font-size:.85rem;opacity:.9;font-weight:600;"
+        f"<div><div style='font-size:.78rem;opacity:.9;font-weight:600;"
         f"text-transform:uppercase;letter-spacing:.05em'>{t('recommendation')}</div>"
-        f"<div style='font-family:Sora,sans-serif;font-size:1.9rem;font-weight:800'>"
+        f"<div style='font-family:Sora,sans-serif;font-size:1.45rem;font-weight:800'>"
         f"{report['recommendation']}</div></div>"
-        f"<div style='text-align:center'><div style='font-size:.8rem;opacity:.9'>"
-        f"{t('overall')}</div><div style='font-size:2.6rem;font-weight:800;"
-        f"font-family:Sora,sans-serif;line-height:1'>{sc10}<span style='font-size:1.1rem;"
+        f"<div style='text-align:center'><div style='font-size:.75rem;opacity:.9'>"
+        f"{t('overall')}</div><div style='font-size:1.9rem;font-weight:800;"
+        f"font-family:Sora,sans-serif;line-height:1'>{sc10}<span style='font-size:1rem;"
         f"opacity:.8'>/10</span></div></div>"
-        f"<div style='text-align:center'><div style='font-size:.8rem;opacity:.9'>"
-        f"{t('grade')}</div><div style='font-size:2.6rem;font-weight:800;"
+        f"<div style='text-align:center'><div style='font-size:.75rem;opacity:.9'>"
+        f"{t('grade')}</div><div style='font-size:1.9rem;font-weight:800;"
         f"font-family:Sora,sans-serif;line-height:1'>{report.get('grade','N/A')}</div></div>"
         f"</div>", unsafe_allow_html=True)
 
     top = st.columns(3)
-    top[0].metric(t("cv_match"), f"{report.get('match_score',0)}%")
-    top[1].metric(t("authenticity"), report.get("authenticity_overall", "N/A"))
-    top[2].metric("Questions", len(report.get("per_question", [])))
+    with top[0]:
+        info_card(t("cv_match"), f"{report.get('match_score',0)}%")
+    with top[1]:
+        info_card(t("authenticity"), report.get("authenticity_overall", "N/A"))
+    with top[2]:
+        info_card(t("questions_label"), len(report.get("per_question", [])))
 
     _category_breakdown()
 
@@ -702,6 +831,17 @@ def main():
         if new_ui != st.session_state.ui_lang:
             st.session_state.ui_lang = new_ui
             st.rerun()
+
+        st.divider()
+        # Persona: candidate (practice) vs interviewer (evaluate).
+        persona_label = st.radio(
+            t("persona"), [t("persona_candidate"), t("persona_interviewer")],
+            index=0 if st.session_state.persona == "candidate" else 1)
+        st.session_state.persona = ("candidate"
+                                    if persona_label == t("persona_candidate")
+                                    else "interviewer")
+        st.caption(t("candidate_hint") if st.session_state.persona == "candidate"
+                   else t("interviewer_hint"))
 
         st.divider()
         mode = st.radio(t("mode"), [t("mode_new"), t("mode_compare")])

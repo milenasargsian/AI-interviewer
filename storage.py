@@ -19,7 +19,7 @@ _RESUME_KEYS = [
     "stage", "cv_text", "cv_analysis", "questions", "current_question_idx",
     "answers", "scores", "job_direction", "context", "num_questions",
     "report", "project_summary", "adaptive", "difficulty_level",
-    "ui_lang", "interview_lang", "auto_read", "jd_text",
+    "ui_lang", "interview_lang", "auto_read", "jd_text", "persona",
 ]
 
 

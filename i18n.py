@@ -130,6 +130,49 @@ _STRINGS = {
                  "hy": "Դեռ պահպանված հաշվետվություններ չկան։",
                  "ru": "Пока нет сохранённых отчётов. Завершите интервью."},
     "rank": {"en": "Rank", "hy": "Տեղ", "ru": "Место"},
+    # ---- persona modes ----
+    "persona": {"en": "I am a…", "hy": "Ես…", "ru": "Я…"},
+    "persona_candidate": {"en": "🎓 Candidate (practice)",
+                          "hy": "🎓 Թեկնածու (պրակտիկա)",
+                          "ru": "🎓 Кандидат (практика)"},
+    "persona_interviewer": {"en": "🧑‍💼 Interviewer (evaluate)",
+                            "hy": "🧑‍💼 Հարցազրուցավար (գնահատում)",
+                            "ru": "🧑‍💼 Интервьюер (оценка)"},
+    "candidate_hint": {
+        "en": "Practice mode: you'll get coaching feedback and tips to improve before the real interview.",
+        "hy": "Պրակտիկ ռեժիմ՝ կստանաք խորհուրդներ և բարելավման ուղիներ իրական հարցազրույցից առաջ։",
+        "ru": "Режим практики: вы получите советы и рекомендации для подготовки к реальному интервью."},
+    "interviewer_hint": {
+        "en": "Evaluation mode: focused on objective scoring and a hire/no-hire decision for selection.",
+        "hy": "Գնահատման ռեժիմ՝ օբյեկտիվ միավորներ և աշխատանքի ընդունման որոշում։",
+        "ru": "Режим оценки: объективные баллы и решение о найме для отбора."},
+    # ---- interview description (free text) ----
+    "interview_desc": {
+        "en": "🗒 Describe the interview in your own words (optional)",
+        "hy": "🗒 Նկարագրեք հարցազրույցը ձեր բառերով (ըստ ցանկության)",
+        "ru": "🗒 Опишите интервью своими словами (необязательно)"},
+    "interview_desc_ph": {
+        "en": "e.g. A friendly 30-min screening; my CV is marketing but I'm pivoting to product. "
+              "Go easy on deep coding, focus on transferable skills and motivation.",
+        "hy": "օր․՝ բարյացակամ 30 րոպեանոց զրույց․ ինքնակենսագրականս մարքեթինգ է, բայց անցնում եմ "
+              "product․ խորը կոդից խուսափիր, կենտրոնացիր փոխանցելի հմտությունների վրա։",
+        "ru": "напр.: дружелюбный 30-мин скрининг; резюме по маркетингу, перехожу в продакт. "
+              "Меньше глубокого кода, упор на переносимые навыки и мотивацию."},
+    # ---- skip ----
+    "skip": {"en": "⏭ Skip (0 points)", "hy": "⏭ Բաց թողնել (0 միավոր)",
+             "ru": "⏭ Пропустить (0 баллов)"},
+    "skipped": {"en": "Skipped — scored 0.", "hy": "Բաց թողնված — 0 միավոր։",
+                "ru": "Пропущено — 0 баллов."},
+    "weaknesses": {"en": "⚠️ Weaknesses", "hy": "⚠️ Թույլ կողմեր", "ru": "⚠️ Слабые стороны"},
+    "improve": {"en": "🚀 How to improve", "hy": "🚀 Ինչպես բարելավել", "ru": "🚀 Как улучшить"},
+    "questions_label": {"en": "Questions", "hy": "Հարցեր", "ru": "Вопросы"},
+    "show_best": {"en": "💡 Show the best possible answer",
+                  "hy": "💡 Ցույց տալ լավագույն հնարավոր պատասխանը",
+                  "ru": "💡 Показать лучший возможный ответ"},
+    "best_answer": {"en": "🌟 Best possible answer", "hy": "🌟 Լավագույն պատասխանը",
+                    "ru": "🌟 Лучший возможный ответ"},
+    "ai_detection": {"en": "AI-answer detection", "hy": "AI-պատասխանի հայտնաբերում",
+                     "ru": "Обнаружение AI-ответа"},
 }
 
 
