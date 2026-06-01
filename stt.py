@@ -1,47 +1,31 @@
-import tempfile
-import os
+"""Speech-to-text using OpenAI Whisper.
+
+We transcribe audio recorded in the browser (via ``st.audio_input``) rather
+than reading a server-side microphone. This is accurate, works when the app
+is deployed, and avoids fragile PyAudio/driver issues on Windows.
+"""
+
+import io
+
+from llm_client import get_client, TRANSCRIBE_MODEL
 
 
-def transcribe_audio(audio_bytes: bytes, api_key: str) -> str:
-    """
-    Transcribe audio using Groq's free Whisper API.
-    No local model download needed — runs in the cloud.
-
-    Args:
-        audio_bytes: Raw audio bytes from audio_recorder_streamlit
-        api_key: Groq API key (free at console.groq.com)
-
-    Returns:
-        Transcribed text string
-    """
-    try:
-        from groq import Groq
-    except ImportError:
-        raise ImportError("Run: pip install groq")
-
+def transcribe_audio_bytes(audio_bytes, filename="answer.wav", language=None):
+    """Transcribe raw audio bytes. Returns (text, error_message)."""
     if not audio_bytes:
-        return ""
+        return "", "No audio was recorded."
 
-    client = Groq(api_key=api_key)
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        f.write(audio_bytes)
-        tmp_path = f.name
+    client = get_client()
+    audio_file = io.BytesIO(audio_bytes)
+    audio_file.name = filename  # the SDK needs a filename hint
 
     try:
-        with open(tmp_path, "rb") as audio_file:
-            transcription = client.audio.transcriptions.create(
-                model="whisper-large-v3",
-                file=audio_file,
-                response_format="text",
-                language="en",
-            )
-        text = transcription if isinstance(transcription, str) else transcription.text
-        return text.strip()
-
-    except Exception as e:
-        raise RuntimeError(f"Transcription failed: {str(e)}")
-
-    finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+        kwargs = {"model": TRANSCRIBE_MODEL, "file": audio_file,
+                  "response_format": "text"}
+        if language:
+            kwargs["language"] = language
+        result = client.audio.transcriptions.create(**kwargs)
+        text = result if isinstance(result, str) else getattr(result, "text", "")
+        return (text or "").strip(), None
+    except Exception as err:
+        return "", f"Transcription failed: {err}"

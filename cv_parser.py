@@ -1,23 +1,28 @@
-import pdfplumber
-import io
+"""PDF text extraction for CVs."""
+
+import re
+import PyPDF2
 
 
-def extract_cv_text(uploaded_file) -> str:
-    """Extract text from uploaded PDF file."""
-    try:
-        file_bytes = uploaded_file.read()
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            pages_text = []
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    pages_text.append(text)
-            full_text = "\n".join(pages_text)
+def extract_text_from_pdf(uploaded_file):
+    """Extract and lightly normalise text from an uploaded PDF file."""
+    reader = PyPDF2.PdfReader(uploaded_file)
+    chunks = []
+    for page in reader.pages:
+        try:
+            chunks.append(page.extract_text() or "")
+        except Exception:
+            chunks.append("")
+    text = "\n".join(chunks)
 
-        if not full_text.strip():
-            raise ValueError("No text could be extracted from the PDF.")
+    # Normalise whitespace so prompts and the name detector behave well.
+    text = text.replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
-        return full_text
 
-    except Exception as e:
-        raise RuntimeError(f"Failed to parse CV: {str(e)}")
+def get_header_lines(text, n=10):
+    """Return the first ``n`` non-empty lines, used as name candidates."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    return lines[:n]

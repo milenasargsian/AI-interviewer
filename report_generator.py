@@ -1,144 +1,148 @@
-from fpdf import FPDF
+"""Final interview verdict / report generation.
+
+Produces a structured report object. Numeric results are computed locally so
+a report is ALWAYS produced, and an AI narrative is layered on top.
+"""
+
 from datetime import datetime
 
+from llm_client import chat_text
 
-class InterviewReport(FPDF):
-    def header(self):
-        self.set_font("Helvetica", "B", 14)
-        self.set_text_color(40, 40, 40)
-        self.cell(0, 10, "AI Interview Assessment Report", align="C", new_x="LMARGIN", new_y="NEXT")
-        self.set_font("Helvetica", "", 9)
-        self.set_text_color(120, 120, 120)
-        self.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C", new_x="LMARGIN", new_y="NEXT")
-        self.ln(4)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font("Helvetica", "I", 8)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f"Page {self.page_no()} | AI-generated report — human review recommended", align="C")
+_SYSTEM = (
+    "You are a senior hiring manager writing the final evaluation of an "
+    "interview. You are objective, specific and decisive, and you ground "
+    "every statement in the candidate's actual answers."
+)
 
 
-def generate_pdf_report(cv_data: dict, questions: list, answers: list, scores: list, overall: dict) -> bytes:
-    """Generate a downloadable PDF interview report."""
-    pdf = InterviewReport()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_margins(20, 20, 20)
+def _recommendation(avg_10):
+    if avg_10 >= 8.5:
+        return "Strong Hire"
+    if avg_10 >= 7.0:
+        return "Hire"
+    if avg_10 >= 5.5:
+        return "Lean Hire"
+    if avg_10 >= 4.0:
+        return "Lean No-Hire"
+    return "No Hire"
 
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(30, 30, 30)
-    pdf.cell(0, 8, "Candidate Summary", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
-    pdf.ln(3)
 
-    pdf.set_font("Helvetica", "", 10)
-    fields = [
-        ("Name", cv_data.get("name", "N/A")),
-        ("Role", cv_data.get("job_role", "N/A")),
-        ("Seniority", cv_data.get("seniority", "N/A").capitalize()),
-        ("Experience", f"{cv_data.get('years_experience', 0)} years"),
-        ("Education", cv_data.get("education", "N/A")),
-        ("Top Skills", ", ".join(cv_data.get("top_skills", []))),
+def generate_report(cv_analysis, questions, answers, scores, job_direction, context=None):
+    """Build a structured report dict (consumed by report_export)."""
+    context = context or {}
+
+    valid_scores = [s.get("score", 0) for s in scores] if scores else []
+    avg_10 = round(sum(valid_scores) / len(valid_scores), 1) if valid_scores else 0.0
+
+    per_question = []
+    for i in range(len(answers)):
+        q = questions[i] if i < len(questions) else {}
+        q_text = q.get("question", "") if isinstance(q, dict) else str(q)
+        s = scores[i] if i < len(scores) else {}
+        per_question.append({
+            "index": i + 1,
+            "category": q.get("category", "") if isinstance(q, dict) else "",
+            "question": q_text,
+            "answer": answers[i],
+            "score": s.get("score", 0),
+            "criteria": s.get("criteria", {}),
+            "strengths": s.get("strengths", []),
+            "weaknesses": s.get("weaknesses", []),
+            "improvements": s.get("improvements", []),
+            "feedback": s.get("feedback", ""),
+        })
+
+    recommendation = _recommendation(avg_10)
+
+    # --- AI narrative (executive summary + verdict). Degrades gracefully. ---
+    qa_summary = "\n".join(
+        f"Q{p['index']} [{p['category']}] {p['question']}\n"
+        f"Answer: {p['answer']}\nScore: {p['score']}/10 — {p['feedback']}\n"
+        for p in per_question
+    )
+
+    narrative_prompt = f"""Write the narrative section of a final interview report.
+
+Candidate: {cv_analysis.get('full_name', 'Candidate')}
+Target role: {cv_analysis.get('target_role')}
+Seniority: {cv_analysis.get('seniority_level', 'N/A')}
+Job direction: {job_direction}
+Industry / Company: {context.get('industry', 'N/A')} / {context.get('company', 'N/A')}
+Overall interview score: {avg_10}/10
+Preliminary recommendation: {recommendation}
+
+Interview transcript with per-answer scores:
+{qa_summary}
+
+Write in Markdown with these sections:
+## Executive Summary  (3-4 sentences)
+## Key Strengths Demonstrated  (bullet list, evidence-based)
+## Areas for Improvement  (bullet list, specific and actionable)
+## Hiring Recommendation  (state the recommendation and justify it)
+## Final Verdict  (one decisive paragraph)
+
+Be concrete and reference the candidate's actual answers."""
+
+    try:
+        narrative_md = chat_text(narrative_prompt, system=_SYSTEM, temperature=0.4)
+    except Exception as err:
+        narrative_md = (
+            f"## Executive Summary\n\n_AI narrative unavailable ({err})._\n\n"
+            f"The candidate achieved an overall score of {avg_10}/10, "
+            f"corresponding to a recommendation of **{recommendation}**."
+        )
+
+    return {
+        "candidate": cv_analysis.get("full_name", "Candidate"),
+        "role": cv_analysis.get("target_role", job_direction),
+        "seniority": cv_analysis.get("seniority_level", "N/A"),
+        "job_direction": job_direction,
+        "industry": context.get("industry", "Not specified"),
+        "company_type": context.get("company_type", "Not specified"),
+        "company": context.get("company", "Not specified"),
+        "overall_score": avg_10,
+        "recommendation": recommendation,
+        "match_score": cv_analysis.get("match_score", 0),
+        "narrative_md": narrative_md,
+        "per_question": per_question,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
+def report_to_markdown(report):
+    """Render the full report as Markdown (used for on-screen + .md export)."""
+    lines = [
+        f"# Interview Report — {report['candidate']}",
+        "",
+        f"**Date:** {report['generated_at']}  ",
+        f"**Target role:** {report['role']} ({report['seniority']})  ",
+        f"**Job direction:** {report['job_direction']}  ",
+        f"**Industry / Company type / Company:** {report['industry']} / "
+        f"{report['company_type']} / {report['company']}  ",
+        f"**CV–Role match:** {report['match_score']}%  ",
+        "",
+        f"## Overall Result",
+        f"- **Overall interview score:** {report['overall_score']}/10",
+        f"- **Recommendation:** {report['recommendation']}",
+        "",
+        report["narrative_md"],
+        "",
+        "## Question-by-Question Breakdown",
     ]
-    for label, value in fields:
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(45, 7, f"{label}:")
-        pdf.set_font("Helvetica", "", 10)
-        # Handle long text
-        pdf.multi_cell(0, 7, str(value), new_x="LMARGIN", new_y="NEXT")
-
-    pdf.ln(4)
-
-    # --- Overall score ---
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Overall Assessment", new_x="LMARGIN", new_y="NEXT")
-    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
-    pdf.ln(3)
-
-    score_val = overall.get("overall", 0)
-    grade = overall.get("grade", "N/A")
-    label = overall.get("label", "")
-
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.set_text_color(50, 100, 200)
-    pdf.cell(0, 12, f"{score_val} / 10  —  Grade: {grade}", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "I", 10)
-    pdf.set_text_color(80, 80, 80)
-    pdf.cell(0, 6, label, new_x="LMARGIN", new_y="NEXT")
-    pdf.set_text_color(30, 30, 30)
-    pdf.ln(2)
-
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(60, 6, f"Questions answered: {overall.get('total_questions', 0)}")
-    pdf.cell(60, 6, f"Highest: {overall.get('highest_score', 0)}/10")
-    pdf.cell(60, 6, f"Lowest: {overall.get('lowest_score', 0)}/10")
-    pdf.ln(8)
-
-    if overall.get("red_flags"):
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_text_color(180, 50, 50)
-        pdf.cell(0, 6, "Red Flags:", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 10)
-        pdf.set_text_color(30, 30, 30)
-        for flag in overall["red_flags"]:
-            pdf.cell(0, 6, f"  • {flag}", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(4)
-
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(30, 30, 30)
-    pdf.cell(0, 8, "Question-by-Question Breakdown", new_x="LMARGIN", new_y="NEXT")
-    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
-    pdf.ln(3)
-
-    for i, (ans, sc) in enumerate(zip(answers, scores)):
-        q = ans.get("question", {})
-        q_text = q.get("question", "N/A")
-        q_type = q.get("type", "").upper()
-        answer_text = ans.get("answer", "No answer")
-
-        # Question header
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_fill_color(240, 240, 245)
-        pdf.cell(0, 7, f"Q{i+1} [{q_type}]  —  Score: {sc['score']}/10", fill=True, new_x="LMARGIN", new_y="NEXT")
-
-        pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 6, f"Question: {q_text}", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(1)
-
-        pdf.set_font("Helvetica", "I", 9)
-        pdf.set_text_color(80, 80, 80)
-        answer_preview = answer_text[:200] + ("..." if len(answer_text) > 200 else "")
-        pdf.multi_cell(0, 5, f"Answer: {answer_preview}", new_x="LMARGIN", new_y="NEXT")
-
-        pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(30, 30, 30)
-        pdf.multi_cell(0, 5, f"Feedback: {sc.get('reasoning', '')}", new_x="LMARGIN", new_y="NEXT")
-
-        if sc.get("improvements"):
-            pdf.set_text_color(100, 80, 0)
-            pdf.multi_cell(0, 5, f"To improve: {sc['improvements']}", new_x="LMARGIN", new_y="NEXT")
-            pdf.set_text_color(30, 30, 30)
-
-        pdf.ln(4)
-
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Responsible AI Transparency Notice", new_x="LMARGIN", new_y="NEXT")
-    pdf.line(20, pdf.get_y(), 190, pdf.get_y())
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "", 10)
-    notices = [
-        "This report was generated by an AI system and should be reviewed by a human recruiter before making hiring decisions.",
-        "AI scoring may reflect biases present in the underlying language model's training data.",
-        "No candidate data is stored beyond the current session.",
-        "All scoring rationale is shown explicitly to enable human oversight and challenge.",
-        "The system does not make hiring recommendations — it provides structured evaluation support only.",
-        "Candidates should be informed that AI tools were used in their assessment process.",
-    ]
-    for notice in notices:
-        pdf.multi_cell(0, 6, f"• {notice}", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(1)
-
-    return bytes(pdf.output())
+    for p in report["per_question"]:
+        crit = p.get("criteria", {})
+        crit_str = ", ".join(f"{k.replace('_', ' ')}: {v}/10" for k, v in crit.items())
+        lines += [
+            "",
+            f"### Q{p['index']} [{p['category']}] — {p['score']}/10",
+            f"**Question:** {p['question']}",
+            "",
+            f"**Answer:** {p['answer']}",
+            "",
+            f"**Criteria:** {crit_str}" if crit_str else "",
+            f"**Strengths:** {'; '.join(p['strengths']) or '—'}",
+            f"**Weaknesses:** {'; '.join(p['weaknesses']) or '—'}",
+            f"**How to improve:** {'; '.join(p['improvements']) or '—'}",
+            f"**Feedback:** {p['feedback']}",
+        ]
+    return "\n".join(l for l in lines if l is not None)
