@@ -13,9 +13,3 @@ reports/
 .sessions/
 
 build/
-dist/
-*.egg-info/
-
-.ruff_cache/
-
-.rich/

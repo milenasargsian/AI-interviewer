@@ -26,6 +26,11 @@ def score_answer(question, answer, job_direction, cv_analysis=None, context=None
     if not answer or not answer.strip():
         return _empty("No answer was provided.")
 
+    # Deterministic guard: a non-answer ("I don't know", "no idea", "pass"…)
+    # is always 0 — never send it to the model (avoids pity points + saves tokens).
+    if _is_non_answer(answer):
+        return _non_answer_score()
+
     jd = context.get("jd_text", "")
     jd_line = (f"\n- Job description requirements: {jd.strip()[:1500]}"
                if jd and jd.strip() else "")
@@ -46,7 +51,10 @@ CANDIDATE'S ANSWER:
 
 PART 1 — QUALITY. Score each criterion 0-10 using this OBJECTIVE anchored scale,
 and justify each with a direct reference to the answer's content:
-  0-2  = absent / wrong / off-topic
+  0    = NON-ANSWER: "I don't know", "no idea", "skip", "pass", "I can't answer",
+         blank, gibberish, or a refusal/admission of not knowing with NO actual
+         attempt. ALL criteria = 0 and overall = 0. Do NOT award pity points.
+  1-2  = attempted but essentially absent / wrong / off-topic
   3-4  = vague or generic; little substance
   5-6  = adequate; addresses the question but shallow or with gaps
   7-8  = strong; correct, specific, well-reasoned
@@ -58,7 +66,8 @@ Criteria:
 - depth: concrete detail, reasoning, trade-offs, ownership, real numbers.
 Calibrate expectations to the stated seniority. Do not inflate: a generic answer
 with no specifics cannot score above 5 on depth. Score only what is written —
-never assume unstated knowledge.
+never assume unstated knowledge. A candidate who merely says they don't know,
+or gives no genuine attempt, scores 0 on every criterion (NOT 1).
 
 PART 2 — AUTHENTICITY (AI-generated detection). Assess whether the answer reads
 as a real person speaking from first-hand experience vs. generic/templated/
@@ -172,6 +181,57 @@ def _empty(message):
         "weaknesses": [],
         "improvements": [],
         "feedback": message,
+        "authenticity_score": 0,
+        "ai_likelihood": 0,
+        "ai_likelihood_llm": 0,
+        "ai_signals": {},
+        "authenticity_verdict": "N/A",
+        "authenticity_signals": [],
+    }
+
+
+# Phrases that, when they make up essentially the whole answer, mean the
+# candidate gave no genuine attempt -> automatic 0 (not 1).
+_NON_ANSWER_PATTERNS = [
+    r"i\s*(do\s*not|don'?t|did\s*not|didn'?t)\s*know",
+    r"i\s*have\s*no\s*(idea|clue)",
+    r"no\s*idea", r"not\s*sure", r"i'?m\s*not\s*sure",
+    r"i\s*can'?t\s*answer", r"i\s*cannot\s*answer",
+    r"i\s*don'?t\s*remember", r"i\s*forgot",
+    r"^\s*(skip|pass|next|n/?a|none|nothing|idk|dunno|dk)\s*$",
+    r"^\s*(no|nope|nah)\s*$",
+]
+
+
+def _is_non_answer(answer):
+    """True if the answer is essentially a non-answer / 'I don't know'."""
+    import re
+    text = (answer or "").strip().lower()
+    if len(text) < 2:
+        return True
+    # Strip trailing punctuation for matching.
+    core = re.sub(r"[\s\.\!\?\,]+$", "", text)
+    # Very short answers that are dominated by a non-answer phrase.
+    for pat in _NON_ANSWER_PATTERNS:
+        if re.search(pat, core):
+            # If the answer is short and matches, it's a non-answer. For longer
+            # answers, only treat as non-answer if the phrase IS basically the
+            # whole thing (e.g. "I don't know, sorry").
+            if len(core.split()) <= 8:
+                return True
+    return False
+
+
+def _non_answer_score():
+    return {
+        "score": 0,
+        "criteria": {"relevance": 0, "technical_accuracy": 0, "clarity": 0, "depth": 0},
+        "strengths": [],
+        "weaknesses": ["The candidate did not attempt the question (e.g. \"I don't know\")."],
+        "improvements": ["Even a partial attempt or thinking out loud scores higher "
+                         "than admitting no knowledge. Share what you DO know and "
+                         "reason from there."],
+        "feedback": "No genuine attempt was made, so this answer scores 0/10.",
         "authenticity_score": 0,
         "ai_likelihood": 0,
         "ai_likelihood_llm": 0,

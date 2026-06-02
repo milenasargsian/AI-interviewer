@@ -11,17 +11,17 @@ Run with:  python -m streamlit run app.py
 
 import streamlit as st
 
-from cv_parser import extract_text_from_pdf
-from cv_analyzer import analyze_cv
-from question_generator import (generate_questions, generate_followup,
+from core.cv_parser import extract_text_from_pdf
+from analysis.cv_analyzer import analyze_cv
+from analysis.question_generator import (generate_questions, generate_followup,
                                 adapt_difficulty, DIFFICULTY_LADDER)
-from scorer import score_answer, model_answer
-from report_generator import generate_report, report_to_markdown
-from stt import transcribe_audio_bytes
-from project_analyzer import extract_project_text, summarize_project
-from tts import synthesize_ex
-from i18n import t, LANGUAGES
-import storage
+from analysis.scorer import score_answer, model_answer
+from reporting.report_generator import generate_report, report_to_markdown
+from media.stt import transcribe_audio_bytes
+from analysis.project_analyzer import extract_project_text, summarize_project
+from media.tts import synthesize_ex
+from services.i18n import t, LANGUAGES
+from services.storage import resume_summary
 
 st.set_page_config(page_title="AI Interview Agent", page_icon="🤖", layout="wide")
 
@@ -762,7 +762,7 @@ def _category_breakdown():
 
 
 def _download_buttons(report, md):
-    from report_export import build_pdf, build_docx, filename
+    from reporting.report_export import build_pdf, build_docx, filename
     cols = st.columns(3)
     with cols[0]:
         try:
@@ -826,9 +826,7 @@ def compare_stage():
         st.rerun()
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+
 def main():
     init_state()
 
