@@ -7,21 +7,28 @@ PDF/DOCX/Markdown export, resume-after-refresh, candidate comparison, and a
 trilingual UI / interview (English · Armenian · Russian).
 
 Run with:  python -m streamlit run app.py
+
+Project layout (modules are grouped into the ``src`` package by responsibility):
+  src.core      — llm_client, cv_parser, name_utils
+  src.analysis  — cv_analyzer, project_analyzer, question_generator, scorer, ai_detector
+  src.reporting — report_generator, report_export
+  src.media     — stt, tts
+  src.services  — i18n, storage
 """
 
 import streamlit as st
 
-from core.cv_parser import extract_text_from_pdf
-from analysis.cv_analyzer import analyze_cv
-from analysis.question_generator import (generate_questions, generate_followup,
-                                adapt_difficulty, DIFFICULTY_LADDER)
-from analysis.scorer import score_answer, model_answer
-from reporting.report_generator import generate_report, report_to_markdown
-from media.stt import transcribe_audio_bytes
-from analysis.project_analyzer import extract_project_text, summarize_project
-from media.tts import synthesize_ex
-from services.i18n import t, LANGUAGES
-from services.storage import resume_summary
+from src.core.cv_parser import extract_text_from_pdf
+from src.analysis.cv_analyzer import analyze_cv
+from src.analysis.question_generator import (generate_questions, generate_followup,
+                                             adapt_difficulty, DIFFICULTY_LADDER)
+from src.analysis.scorer import score_answer, model_answer
+from src.reporting.report_generator import generate_report, report_to_markdown
+from src.media.stt import transcribe_audio_bytes
+from src.analysis.project_analyzer import extract_project_text, summarize_project
+from src.media.tts import synthesize_ex
+from src.services.i18n import t, LANGUAGES
+from src.services import storage
 
 st.set_page_config(page_title="AI Interview Agent", page_icon="🤖", layout="wide")
 
@@ -762,7 +769,7 @@ def _category_breakdown():
 
 
 def _download_buttons(report, md):
-    from reporting.report_export import build_pdf, build_docx, filename
+    from src.reporting.report_export import build_pdf, build_docx, filename
     cols = st.columns(3)
     with cols[0]:
         try:
@@ -826,7 +833,9 @@ def compare_stage():
         st.rerun()
 
 
-
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 def main():
     init_state()
 

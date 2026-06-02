@@ -6,7 +6,7 @@ a report is ALWAYS produced, and an AI narrative is layered on top.
 
 from datetime import datetime
 
-from llm_client import chat_text, lang_directive
+from src.core.llm_client import chat_text, lang_directive
 
 _SYSTEM = (
     "You are a senior hiring manager writing the final evaluation of an "

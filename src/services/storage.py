@@ -27,6 +27,9 @@ def _ensure_dirs():
     os.makedirs(_CANDIDATES_DIR, exist_ok=True)
 
 
+# ---------------------------------------------------------------------------
+# Resume support
+# ---------------------------------------------------------------------------
 def save_resume(state):
     """Persist the resumable subset of session state to disk."""
     try:
@@ -75,7 +78,9 @@ def resume_summary():
     }
 
 
-
+# ---------------------------------------------------------------------------
+# Candidate comparison
+# ---------------------------------------------------------------------------
 def save_candidate(report):
     """Save a finished report as a candidate record for later comparison."""
     try:

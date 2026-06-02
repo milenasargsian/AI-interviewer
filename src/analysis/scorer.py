@@ -4,8 +4,8 @@ Also flags answers that read as AI-generated / inauthentic vs. natural and
 personal, since a real interview rewards genuine, first-hand responses.
 """
 
-from llm_client import chat_json, chat_text, lang_directive
-from ai_detector import blend
+from src.core.llm_client import chat_json, chat_text, lang_directive
+from src.analysis.ai_detector import blend
 
 _SYSTEM = (
     "You are a rigorous, fair interview evaluator. You score answers against "

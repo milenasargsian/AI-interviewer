@@ -6,8 +6,8 @@ multiple languages, and can produce a single adaptive follow-up whose
 difficulty adapts to how the candidate is performing.
 """
 
-from llm_client import chat_json, lang_directive
-from project_analyzer import project_brief
+from src.core.llm_client import chat_json, lang_directive
+from src.analysis.project_analyzer import project_brief
 
 _SYSTEM = (
     "You are a world-class interviewer who designs sharp, realistic interview "

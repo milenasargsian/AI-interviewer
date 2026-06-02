@@ -9,7 +9,7 @@ import io
 import os
 import zipfile
 
-from llm_client import chat_json
+from src.core.llm_client import chat_json
 
 # Text-like extensions we will read directly from files / archives.
 _TEXT_EXTS = {

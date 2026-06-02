@@ -4,9 +4,9 @@ When a real job description (JD) is provided, the match is computed against the
 actual posting rather than just a role title.
 """
 
-from llm_client import chat_json, trim_cv, lang_directive
-from cv_parser import get_header_lines
-from name_utils import resolve_name, split_first_last
+from src.core.llm_client import chat_json, trim_cv, lang_directive
+from src.core.cv_parser import get_header_lines
+from src.core.name_utils import resolve_name, split_first_last
 
 _SYSTEM = (
     "You are a senior technical recruiter and career advisor with 15+ years "

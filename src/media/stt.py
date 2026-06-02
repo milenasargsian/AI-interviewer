@@ -8,7 +8,7 @@ is deployed, and avoids fragile PyAudio/driver issues on Windows. Passing the
 
 import io
 
-from llm_client import get_client, TRANSCRIBE_MODEL
+from src.core.llm_client import get_client, TRANSCRIBE_MODEL
 
 
 def transcribe_audio_bytes(audio_bytes, filename="answer.wav", language=None):
