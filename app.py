@@ -19,7 +19,7 @@ from scorer import score_answer, model_answer
 from report_generator import generate_report, report_to_markdown
 from stt import transcribe_audio_bytes
 from project_analyzer import extract_project_text, summarize_project
-from tts import synthesize
+from tts import synthesize_ex
 from i18n import t, LANGUAGES
 import storage
 
@@ -135,11 +135,12 @@ def play_tts(text):
     """Render an audio player for a question if read-aloud is enabled."""
     if not st.session_state.get("auto_read"):
         return
-    audio = synthesize(text, st.session_state.get("interview_lang", "en"))
+    with st.spinner("Generating audio…"):
+        audio, err = synthesize_ex(text, st.session_state.get("interview_lang", "en"))
     if audio:
         st.audio(audio, format="audio/mp3")
     else:
-        st.caption("🔇 Voice output unavailable (install `gTTS` and check your connection).")
+        st.caption(f"🔇 Voice output unavailable — {err}. Check your internet connection.")
 
 
 # ---------------------------------------------------------------------------
@@ -395,22 +396,24 @@ def interview_stage():
     play_tts(q.get("question", ""))
     if not st.session_state.get("auto_read"):
         if st.button(t("read_aloud"), key=f"read_{idx}"):
-            audio = synthesize(q.get("question", ""), st.session_state.interview_lang)
+            with st.spinner("Generating audio…"):
+                audio, err = synthesize_ex(q.get("question", ""),
+                                           st.session_state.interview_lang)
             if audio:
                 st.audio(audio, format="audio/mp3")
             else:
-                st.caption("🔇 Voice output unavailable.")
+                st.caption(f"🔇 Voice output unavailable — {err}. Check your internet connection.")
 
     answered = idx < len(st.session_state.answers)
     if not answered:
-        _answer_panel(idx, q)
+        _answer_panel(idx, q, total)
     else:
         _evaluation_panel(idx, q, total)
 
     _previous_answers(idx)
 
 
-def _answer_panel(idx, q):
+def _answer_panel(idx, q, total):
     answer_key = f"answer_{idx}"
     if hasattr(st, "audio_input"):
         audio = st.audio_input(t("record_voice"), key=f"audio_{idx}")
@@ -442,6 +445,14 @@ def _answer_panel(idx, q):
             recent = [s.get("score", 0) for s in st.session_state.scores]
             st.session_state.difficulty_level = adapt_difficulty(
                 st.session_state.difficulty_level, recent)
+        # Skipping goes straight to the next question (no evaluation panel).
+        if idx == total - 1:
+            st.session_state.current_question_idx = idx + 1
+            st.session_state.report = None
+            st.session_state.report_saved = False
+            st.session_state.stage = "report"
+        else:
+            _advance_to_next(idx)
         persist()
         st.rerun()
 

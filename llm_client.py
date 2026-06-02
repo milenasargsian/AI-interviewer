@@ -57,35 +57,63 @@ def chat_json(prompt, *, system=None, temperature=0.3, model=None, max_retries=2
         + " Always respond with a single valid JSON object and nothing else.",
     }, {"role": "user", "content": prompt}]
 
+    # Try the primary model, then fall back to the fast model if the daily
+    # token limit (429) on the big model is hit, so the app keeps working.
+    models = _model_chain(model)
     last_err = None
-    for attempt in range(max_retries + 1):
-        try:
-            resp = client.chat.completions.create(
-                model=model or TEXT_MODEL,
-                messages=messages,
-                temperature=temperature,
-                response_format={"type": "json_object"},
-            )
-            return json.loads(resp.choices[0].message.content)
-        except Exception as err:  # network, parse or API error
-            last_err = err
-            time.sleep(0.6 * (attempt + 1))
+    for mdl in models:
+        for attempt in range(max_retries + 1):
+            try:
+                resp = client.chat.completions.create(
+                    model=mdl,
+                    messages=messages,
+                    temperature=temperature,
+                    response_format={"type": "json_object"},
+                )
+                return json.loads(resp.choices[0].message.content)
+            except Exception as err:
+                last_err = err
+                if _is_rate_limit(err):
+                    break  # don't retry same model; move to fallback
+                time.sleep(0.6 * (attempt + 1))
     raise last_err
 
 
 def chat_text(prompt, *, system=None, temperature=0.5, model=None):
-    """Call the chat API and return free-form text."""
+    """Call the chat API and return free-form text (with model fallback)."""
     client = get_client()
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    resp = client.chat.completions.create(
-        model=model or TEXT_MODEL,
-        messages=messages,
-        temperature=temperature,
-    )
-    return resp.choices[0].message.content.strip()
+
+    last_err = None
+    for mdl in _model_chain(model):
+        try:
+            resp = client.chat.completions.create(
+                model=mdl, messages=messages, temperature=temperature)
+            return resp.choices[0].message.content.strip()
+        except Exception as err:
+            last_err = err
+            if not _is_rate_limit(err):
+                raise
+    raise last_err
+
+
+def _model_chain(model):
+    """Primary model first, then the fast model as a fallback (deduped)."""
+    primary = model or TEXT_MODEL
+    chain = [primary]
+    if FAST_MODEL and FAST_MODEL != primary:
+        chain.append(FAST_MODEL)
+    return chain
+
+
+def _is_rate_limit(err):
+    """True if the error is a 429 / daily-token-limit error."""
+    s = str(err).lower()
+    return ("429" in s or "rate_limit" in s or "rate limit" in s
+            or "tokens per day" in s or "tpd" in s)
 
 
 _LANG_NAMES = {"en": "English", "hy": "Armenian", "ru": "Russian"}

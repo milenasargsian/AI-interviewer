@@ -80,12 +80,19 @@ Be specific and realistic. Avoid vague or generic titles.{lang_directive(intervi
     try:
         data = chat_json(prompt, system=_SYSTEM, temperature=0.2)
     except Exception as err:
+        msg = str(err)
+        if "429" in msg or "rate_limit" in msg.lower() or "tokens per day" in msg.lower():
+            friendly = ("Daily free API quota reached. The app paused — please try "
+                        "again later (the limit resets within ~1 hour), or add a "
+                        "fresh Groq key in the .env file.")
+        else:
+            friendly = f"Analysis temporarily unavailable: {err}"
         return {
             "full_name": resolve_name(header_lines=header_lines),
             "first_name": "", "last_name": "",
             "target_role": job_direction, "seniority_level": "N/A",
             "years_of_experience": 0, "match_score": 0,
-            "match_rationale": f"Analysis failed: {err}",
+            "match_rationale": friendly,
             "key_skills": [], "strengths": [], "gaps": [],
             "transferable_skills": [], "fit_note": "",
             "jd_requirements": [], "summary": "",
