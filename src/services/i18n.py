@@ -7,7 +7,6 @@ UI strings are looked up with ``t(key)``. The *interview content* language
 
 import streamlit as st
 
-# Display name -> language code. Display names are shown in the selector.
 LANGUAGES = {
     "English": "en",
     "Հայերեն (Armenian)": "hy",
@@ -17,7 +16,7 @@ LANGUAGES = {
 LANG_NAMES = {"en": "English", "hy": "Armenian", "ru": "Russian"}
 
 _STRINGS = {
-    # ---- generic / hero ----
+    # ---- generic ----
     "app_subtitle": {
         "en": "CV-based intelligent interviewing — analysis, adaptive questions, "
               "problem-solving, authenticity checks and a graded verdict.",
@@ -26,6 +25,7 @@ _STRINGS = {
         "ru": "Умное интервью на основе резюме — анализ, адаптивные вопросы, "
               "решение задач, проверка подлинности и итоговая оценка.",
     },
+
     # ---- sidebar ----
     "session": {"en": "Session", "hy": "Աշխատաշրջան", "ru": "Сессия"},
     "candidate": {"en": "Candidate", "hy": "Թեկնածու", "ru": "Кандидат"},
@@ -41,11 +41,13 @@ _STRINGS = {
     "auto_read": {"en": "🔊 Read questions aloud",
                   "hy": "🔊 Կարդալ հարցերը բարձրաձայն",
                   "ru": "🔊 Озвучивать вопросы"},
+
     # ---- step labels ----
     "step_upload": {"en": "1 · Upload", "hy": "1 · Վերբեռնում", "ru": "1 · Загрузка"},
     "step_analysis": {"en": "2 · Analysis", "hy": "2 · Վերլուծություն", "ru": "2 · Анализ"},
     "step_interview": {"en": "3 · Interview", "hy": "3 · Հարցազրույց", "ru": "3 · Интервью"},
     "step_verdict": {"en": "4 · Verdict", "hy": "4 · Եզրակացություն", "ru": "4 · Вердикт"},
+
     # ---- upload stage ----
     "upload_title": {"en": "📄 Step 1 — Upload CV & set the interview context",
                      "hy": "📄 Քայլ 1 — Վերբեռնեք ինքնակենսագրականը և սահմանեք համատեքստը",
@@ -80,6 +82,7 @@ _STRINGS = {
     "resume_prev": {"en": "↩️ Resume previous interview",
                     "hy": "↩️ Շարունակել նախորդ հարցազրույցը",
                     "ru": "↩️ Продолжить прошлое интервью"},
+
     # ---- analysis stage ----
     "analysis_title": {"en": "📊 Step 2 — CV Analysis", "hy": "📊 Քայլ 2 — Վերլուծություն",
                        "ru": "📊 Шаг 2 — Анализ резюме"},
@@ -91,6 +94,7 @@ _STRINGS = {
     "gaps": {"en": "⚠️ Gaps", "hy": "⚠️ Բացեր", "ru": "⚠️ Пробелы"},
     "back": {"en": "⬅️ Back", "hy": "⬅️ Հետ", "ru": "⬅️ Назад"},
     "start_interview": {"en": "➡️ Start interview", "hy": "➡️ Սկսել հարցազրույցը", "ru": "➡️ Начать интервью"},
+
     # ---- interview stage ----
     "interview_title": {"en": "💬 Step 3 — Interview", "hy": "💬 Քայլ 3 — Հարցազրույց",
                         "ru": "💬 Шаг 3 — Интервью"},
@@ -111,6 +115,7 @@ _STRINGS = {
     "prev_questions": {"en": "📝 Previous questions", "hy": "📝 Նախորդ հարցերը",
                        "ru": "📝 Предыдущие вопросы"},
     "your_answer_h": {"en": "🗣 Your answer", "hy": "🗣 Ձեր պատասխանը", "ru": "🗣 Ваш ответ"},
+
     # ---- report stage ----
     "report_title": {"en": "📈 Step 4 — Final Verdict & Report",
                      "hy": "📈 Քայլ 4 — Վերջնական եզրակացություն",
@@ -123,6 +128,7 @@ _STRINGS = {
                  "ru": "📥 Скачать отчёт"},
     "new_interview": {"en": "🔄 Start a new interview", "hy": "🔄 Սկսել նոր հարցազրույց",
                       "ru": "🔄 Начать новое интервью"},
+
     # ---- compare stage ----
     "compare_title": {"en": "🏆 Compare Candidates", "hy": "🏆 Համեմատել թեկնածուներին",
                       "ru": "🏆 Сравнение кандидатов"},
@@ -130,6 +136,7 @@ _STRINGS = {
                  "hy": "Դեռ պահպանված հաշվետվություններ չկան։",
                  "ru": "Пока нет сохранённых отчётов. Завершите интервью."},
     "rank": {"en": "Rank", "hy": "Տեղ", "ru": "Место"},
+
     # ---- persona modes ----
     "persona": {"en": "I am a…", "hy": "Ես…", "ru": "Я…"},
     "persona_candidate": {"en": "🎓 Candidate (practice)",
@@ -146,6 +153,7 @@ _STRINGS = {
         "en": "Evaluation mode: focused on objective scoring and a hire/no-hire decision for selection.",
         "hy": "Գնահատման ռեժիմ՝ օբյեկտիվ միավորներ և աշխատանքի ընդունման որոշում։",
         "ru": "Режим оценки: объективные баллы и решение о найме для отбора."},
+
     # ---- interview description (free text) ----
     "interview_desc": {
         "en": "🗒 Describe the interview in your own words (optional)",
@@ -158,6 +166,7 @@ _STRINGS = {
               "product․ խորը կոդից խուսափիր, կենտրոնացիր փոխանցելի հմտությունների վրա։",
         "ru": "напр.: дружелюбный 30-мин скрининг; резюме по маркетингу, перехожу в продакт. "
               "Меньше глубокого кода, упор на переносимые навыки и мотивацию."},
+
     # ---- skip ----
     "skip": {"en": "⏭ Skip (0 points)", "hy": "⏭ Բաց թողնել (0 միավոր)",
              "ru": "⏭ Пропустить (0 баллов)"},

@@ -8,10 +8,10 @@ interviewer would actually want to dig into.
 import io
 import os
 import zipfile
+import PyPDF2
 
 from src.core.llm_client import chat_json
 
-# Text-like extensions we will read directly from files / archives.
 _TEXT_EXTS = {
     ".txt", ".md", ".rst", ".py", ".js", ".ts", ".tsx", ".jsx", ".java",
     ".c", ".cpp", ".h", ".hpp", ".cs", ".go", ".rb", ".php", ".rs", ".kt",
@@ -19,7 +19,6 @@ _TEXT_EXTS = {
     ".html", ".css", ".sh", ".r", ".m", ".dart",
 }
 
-# Skip noise inside archives.
 _SKIP_DIRS = {"node_modules", ".git", "venv", ".venv", "__pycache__",
               "dist", "build", ".next", "target"}
 
@@ -34,7 +33,6 @@ def _read_text_bytes(data, name):
 
 
 def _extract_pdf(data):
-    import PyPDF2
     reader = PyPDF2.PdfReader(io.BytesIO(data))
     return "\n".join((p.extract_text() or "") for p in reader.pages)
 
@@ -73,10 +71,12 @@ def extract_project_text(uploaded_files):
     for f in uploaded_files:
         name = getattr(f, "name", "file")
         ext = os.path.splitext(name)[1].lower()
+
         try:
             data = f.getvalue() if hasattr(f, "getvalue") else f.read()
         except Exception:
             continue
+
         if ext == ".pdf":
             text = _extract_pdf(data)
         elif ext == ".zip":
@@ -127,8 +127,10 @@ names from the project where possible."""
     for key in ("tech_stack", "key_components", "strengths", "concerns", "probe_topics"):
         if not isinstance(data.get(key), list):
             data[key] = []
+
     data.setdefault("title", "Submitted project")
     data.setdefault("summary", "")
+
     return data
 
 
@@ -137,6 +139,7 @@ def project_brief(project_summary):
     if not project_summary:
         return "None provided."
     p = project_summary
+
     return (
         f"Title: {p.get('title','')}\n"
         f"Summary: {p.get('summary','')}\n"

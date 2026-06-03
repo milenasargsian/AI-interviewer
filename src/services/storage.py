@@ -1,8 +1,8 @@
-"""Local persistence: resume an in-progress interview, and save finished
+"""
+Local persistence: resume an in-progress interview, and save finished
 candidate reports for comparison/ranking.
 
-Everything is stored as JSON under a local ``.sessions`` folder next to the
-app. No external services; data never leaves the machine.
+Everything is stored as JSON under a local .sessions folder next to the app.
 """
 
 import os
@@ -14,7 +14,6 @@ _BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".sessions")
 _RESUME = os.path.join(_BASE, "_resume.json")
 _CANDIDATES_DIR = os.path.join(_BASE, "candidates")
 
-# Session keys that make up a resumable interview.
 _RESUME_KEYS = [
     "stage", "cv_text", "cv_analysis", "questions", "current_question_idx",
     "answers", "scores", "job_direction", "context", "num_questions",
@@ -27,9 +26,7 @@ def _ensure_dirs():
     os.makedirs(_CANDIDATES_DIR, exist_ok=True)
 
 
-# ---------------------------------------------------------------------------
 # Resume support
-# ---------------------------------------------------------------------------
 def save_resume(state):
     """Persist the resumable subset of session state to disk."""
     try:
@@ -78,9 +75,7 @@ def resume_summary():
     }
 
 
-# ---------------------------------------------------------------------------
 # Candidate comparison
-# ---------------------------------------------------------------------------
 def save_candidate(report):
     """Save a finished report as a candidate record for later comparison."""
     try:

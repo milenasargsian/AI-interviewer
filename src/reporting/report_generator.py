@@ -60,7 +60,7 @@ def generate_report(cv_analysis, questions, answers, scores, job_direction,
     valid_scores = [s.get("score", 0) for s in scores] if scores else []
     avg_10 = round(sum(valid_scores) / len(valid_scores), 1) if valid_scores else 0.0
 
-    # Aggregate authenticity across the interview.
+    # Aggregate authenticity across the interview
     auth_scores = [s.get("authenticity_score") for s in scores
                    if isinstance(s.get("authenticity_score"), (int, float))]
     ai_scores = [s.get("ai_likelihood") for s in scores
@@ -102,7 +102,6 @@ def generate_report(cv_analysis, questions, answers, scores, job_direction,
     recommendation = _recommendation(avg_10)
     grade = _letter_grade(avg_10)
 
-    # --- AI narrative (executive summary + verdict). Degrades gracefully. ---
     qa_summary = "\n".join(
         f"Q{p['index']} [{p['category']}] {p['question']}\n"
         f"Answer: {p['answer']}\nScore: {p['score']}/10 — {p['feedback']} "
@@ -221,4 +220,5 @@ def report_to_markdown(report):
             f"**How to improve:** {'; '.join(p['improvements']) or '—'}",
             f"**Feedback:** {p['feedback']}",
         ]
+
     return "\n".join(l for l in lines if l is not None)

@@ -9,8 +9,7 @@ import io
 
 _GTTS_LANG = {"en": "en", "hy": "hy", "ru": "ru"}
 
-# Cache ONLY successful syntheses (keyed by text+lang). We must never cache a
-# failure, otherwise a single offline moment would permanently disable audio.
+# Cache ONLY successful syntheses
 _CACHE = {}
 
 
@@ -36,6 +35,7 @@ def synthesize_ex(text, lang="en"):
         data = buf.getvalue()
         _CACHE[key] = data  # cache success only
         return data, None
+
     except Exception as err:
         return None, f"network/synthesis error ({err})"
 
@@ -43,4 +43,5 @@ def synthesize_ex(text, lang="en"):
 def synthesize(text, lang="en"):
     """Return MP3 bytes for ``text`` in ``lang``, or None on failure."""
     data, _ = synthesize_ex(text, lang)
+
     return data

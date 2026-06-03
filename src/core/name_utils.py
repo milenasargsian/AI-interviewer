@@ -7,14 +7,11 @@ stray symbols/emails, and inconsistent casing.
 
 import re
 
-# Name particles that conventionally stay lowercase when they sit *inside*
-# a name (e.g. "Ludwig van Beethoven") but are capitalised at the start.
 _PARTICLES = {
     "de", "da", "di", "van", "von", "der", "den", "del", "della", "la",
     "le", "el", "du", "dos", "das", "bin", "ibn", "al", "y",
 }
 
-# Generational / academic suffixes with canonical formatting.
 _SUFFIX_MAP = {
     "jr": "Jr.", "sr": "Sr.", "ii": "II", "iii": "III", "iv": "IV",
     "v": "V", "phd": "PhD", "md": "MD", "msc": "MSc", "bsc": "BSc",
@@ -32,11 +29,13 @@ def _cap(part):
 
 def _cap_word(word):
     """Capitalise a single word, preserving hyphens and apostrophes."""
-    # Handle hyphenated names (Anne-Marie) and apostrophes (O'Brien, D'Angelo).
+    # Handles hyphenated names (Anne-Marie) and apostrophes (O'Brien, D'Angelo).
     segments = word.split("-")
+
     out_segments = []
     for seg in segments:
         out_segments.append("'".join(_cap(p) for p in seg.split("'")))
+
     return "-".join(out_segments)
 
 
@@ -45,7 +44,7 @@ def format_full_name(raw):
     if not raw or not isinstance(raw, str):
         return ""
 
-    # Take the first logical line/segment; drop emails, phones, labels.
+    # Drop emails, phones, labels.
     name = re.split(r"[\n\r|,;:/\\]", raw)[0]
     name = re.sub(r"\S+@\S+", " ", name)            # emails
     name = re.sub(r"[^A-Za-zÀ-ɏ'\-.\s]", " ", name)  # keep letters/accents
@@ -60,26 +59,33 @@ def format_full_name(raw):
     out = []
     for i, token in enumerate(tokens):
         low = token.lower().strip(".")
+
         if low in _SUFFIX_MAP:
             out.append(_SUFFIX_MAP[low])
+
         elif low in _PARTICLES and 0 < i < n - 1:
             out.append(low)
+
         else:
             out.append(_cap_word(token))
+
     return " ".join(out).strip()
 
 
 def split_first_last(full_name):
     """Split a formatted full name into (first, last)."""
     parts = [p for p in full_name.split() if p]
+
     if not parts:
         return "", ""
+
     if len(parts) == 1:
         return parts[0], ""
-    # Ignore trailing suffixes when picking the surname.
+
     core = [p for p in parts if p.lower().strip(".") not in _SUFFIX_MAP]
     if len(core) <= 1:
         return parts[0], ""
+
     return core[0], " ".join(core[1:])
 
 
@@ -92,6 +98,7 @@ def resolve_name(model_full=None, model_first=None, model_last=None, header_line
     candidate = ""
     if model_full and model_full.strip().lower() not in {"n/a", "unknown", ""}:
         candidate = model_full
+
     elif (model_first or model_last):
         candidate = f"{model_first or ''} {model_last or ''}"
 
@@ -99,14 +106,14 @@ def resolve_name(model_full=None, model_first=None, model_last=None, header_line
     if formatted:
         return formatted
 
-    # Fall back to the CV header (first few lines), picking the first line
-    # that reads like a 2-4 word name without digits.
     for line in header_lines or []:
         if any(ch.isdigit() for ch in line):
             continue
+
         words = line.split()
         if 1 < len(words) <= 4 and "@" not in line:
             formatted = format_full_name(line)
             if formatted:
                 return formatted
+
     return formatted or "Candidate"

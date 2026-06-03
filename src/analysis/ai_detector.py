@@ -54,8 +54,8 @@ def heuristic_ai_likelihood(text):
     text = (text or "").strip()
     words = _tokens(text)
     n = len(words)
+
     if n < 8:
-        # Too short to judge stylistically — stay neutral, let the LLM lead.
         return 50, {"note": "answer too short for reliable stylometric analysis"}
 
     sents = _sentences(text) or [text]
@@ -77,48 +77,41 @@ def heuristic_ai_likelihood(text):
     list_like = sum(1 for m in _LIST_MARKERS if m in low)
     past_tense = len(re.findall(r"\b\w+ed\b", low)) / n
 
-    # --- score contributions: positive => more AI-like ---
+    # positive => more AI-like
     score = 50.0
-    # Uniform sentence length is a strong AI tell.
     if burstiness < 0.25:
         score += 18
     elif burstiness < 0.45:
         score += 8
     else:
-        score -= 12  # human variability
+        score -= 12  # human
 
-    # Personal voice strongly indicates a real, first-hand answer.
     if personal < 0.02:
         score += 16
     elif personal > 0.06:
         score -= 16
 
-    # Concreteness (numbers / specifics) is human; absence is AI-ish.
     if numbers > 0.01:
         score -= 10
     else:
         score += 6
 
-    # Buzzword stacking is templated/AI.
     if buzz > 0.05:
         score += 16
     elif buzz > 0.025:
         score += 8
 
-    # Hedges / disfluency / self-correction => spontaneous human speech.
     if hedge_rate >= 1.0:
         score -= 14
     elif hedge_rate >= 0.4:
         score -= 7
 
-    # Even "Firstly/Secondly/In conclusion" scaffolding => AI essay style.
+    # AI essay style.
     score += min(list_like, 3) * 6
 
-    # Past-tense storytelling ("I built", "we shipped") => real experience.
     if past_tense > 0.06:
         score -= 6
 
-    # Extremely high lexical variety with long words can indicate generation.
     if ttr > 0.85 and mean_len > 18:
         score += 8
 
@@ -145,12 +138,15 @@ def blend(llm_ai_likelihood, text, llm_weight=0.55):
     words = _tokens(text)
     try:
         llm = max(0, min(100, float(llm_ai_likelihood)))
+
     except (TypeError, ValueError):
         llm = 50.0
 
     if len(words) < 12:
         # Not enough text for stylometry — lean on the model.
         final = round(0.8 * llm + 0.2 * heur)
+
     else:
         final = round(llm_weight * llm + (1 - llm_weight) * heur)
+
     return max(0, min(100, final)), signals

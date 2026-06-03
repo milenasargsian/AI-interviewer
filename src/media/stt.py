@@ -28,5 +28,6 @@ def transcribe_audio_bytes(audio_bytes, filename="answer.wav", language=None):
         result = client.audio.transcriptions.create(**kwargs)
         text = result if isinstance(result, str) else getattr(result, "text", "")
         return (text or "").strip(), None
+
     except Exception as err:
         return "", f"Transcription failed: {err}"

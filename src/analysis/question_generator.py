@@ -21,14 +21,15 @@ CATEGORIES = [
     "Project", "Scenario/Case", "Gap-probing",
 ]
 
-# Difficulty ladder used for adaptive difficulty.
 DIFFICULTY_LADDER = ["Easy", "Medium", "Hard", "Expert"]
 
 
 def _jd_block(context):
     jd = (context or {}).get("jd_text", "")
+
     if jd and jd.strip():
         return f"\nTARGET JOB DESCRIPTION (tailor questions to THESE requirements):\n{jd.strip()[:3500]}\n"
+
     return ""
 
 
@@ -112,6 +113,7 @@ first, harder problem-solving and scenarios in the middle, reflective last).{lan
         questions = data.get("questions", [])
         if isinstance(questions, list) and questions:
             return [_normalise(q) for q in questions][:num_questions]
+
     except Exception:
         pass
 
@@ -126,12 +128,15 @@ def adapt_difficulty(current_level, recent_scores):
     """
     if not recent_scores:
         return current_level
+
     window = recent_scores[-2:]
     avg = sum(window) / len(window)
+
     if avg >= 8.0:
         current_level = min(current_level + 1, len(DIFFICULTY_LADDER) - 1)
     elif avg <= 4.5:
         current_level = max(current_level - 1, 0)
+
     return current_level
 
 
@@ -192,14 +197,17 @@ Return a JSON object:
         q["is_followup"] = bool(data.get("is_followup", False))
         if q["question"]:
             return q
+
     except Exception:
         pass
+
     return None
 
 
 def _normalise(q):
     if isinstance(q, str):
         q = {"question": q}
+
     return {
         "category": q.get("category", "General"),
         "difficulty": q.get("difficulty", "Medium"),
@@ -229,6 +237,8 @@ def _fallback(cv_analysis, job_direction, num_questions):
          "question": "Describe a time you disagreed with a teammate. How did you resolve it?"},
     ]
     out = [_normalise(q) for q in base]
+
     while len(out) < num_questions:
         out.append(out[len(out) % len(base)])
+
     return out[:num_questions]

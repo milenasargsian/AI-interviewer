@@ -98,7 +98,6 @@ Be specific and realistic. Avoid vague or generic titles.{lang_directive(intervi
             "jd_requirements": [], "summary": "",
         }
 
-    # --- Normalise the name so it is always clean and correctly cased ---
     full = resolve_name(
         model_full=data.get("full_name"),
         model_first=data.get("first_name"),
@@ -111,11 +110,11 @@ Be specific and realistic. Avoid vague or generic titles.{lang_directive(intervi
     data["last_name"] = last
     data["name"] = full  # backwards-compatible alias
 
-    # --- Defensive defaults / clamping ---
     try:
         data["match_score"] = max(0, min(100, int(round(float(data.get("match_score", 0))))))
     except (TypeError, ValueError):
         data["match_score"] = 0
+
     for key in ("key_skills", "strengths", "gaps", "jd_requirements",
                 "transferable_skills"):
         if not isinstance(data.get(key), list):

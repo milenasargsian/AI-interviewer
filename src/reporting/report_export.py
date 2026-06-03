@@ -2,6 +2,7 @@
 
 import io
 import re
+from docx import Document
 
 
 def _safe_filename(candidate):
@@ -64,7 +65,6 @@ def build_pdf(report):
         f"<b>Answer authenticity:</b> {auth_line}<br/>"
         f"<b>CV–Role match:</b> {report['match_score']}%", styles["Body"]))
 
-    # Narrative: convert simple Markdown to paragraphs.
     for block in _markdown_blocks(report["narrative_md"]):
         kind, text = block
         if kind == "h":
@@ -101,9 +101,6 @@ def build_pdf(report):
 
 def build_docx(report):
     """Return the report as DOCX bytes using python-docx."""
-    from docx import Document
-    from docx.shared import Pt, RGBColor
-
     document = Document()
     title = document.add_heading(f"Interview Report — {report['candidate']}", level=0)
 

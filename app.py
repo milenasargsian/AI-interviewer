@@ -150,9 +150,7 @@ def play_tts(text):
         st.caption(f"🔇 Voice output unavailable — {err}. Check your internet connection.")
 
 
-# ---------------------------------------------------------------------------
 # Stage 1 — Upload
-# ---------------------------------------------------------------------------
 def upload_stage():
     st.markdown(f"### {t('upload_title')}")
 
@@ -291,9 +289,7 @@ def _do_resume():
         st.rerun()
 
 
-# ---------------------------------------------------------------------------
 # Stage 2 — Analysis
-# ---------------------------------------------------------------------------
 def analysis_stage():
     a = st.session_state.cv_analysis
     st.markdown(f"### {t('analysis_title')}")
@@ -371,9 +367,7 @@ def analysis_stage():
         st.rerun()
 
 
-# ---------------------------------------------------------------------------
 # Stage 3 — Interview
-# ---------------------------------------------------------------------------
 def interview_stage():
     questions = st.session_state.questions
     idx = st.session_state.current_question_idx
@@ -399,7 +393,7 @@ def interview_stage():
     if q.get("what_it_assesses"):
         st.caption(f"💡 {q['what_it_assesses']}")
 
-    # Voice output of the question.
+    # Voice output of the question
     play_tts(q.get("question", ""))
     if not st.session_state.get("auto_read"):
         if st.button(t("read_aloud"), key=f"read_{idx}"):
@@ -476,6 +470,7 @@ def _answer_panel(idx, q, total):
                 interview_lang=st.session_state.interview_lang)
         st.session_state.answers.append(final_answer)
         st.session_state.scores.append(score)
+
         # Adapt difficulty for upcoming questions.
         if st.session_state.adaptive:
             recent = [s.get("score", 0) for s in st.session_state.scores]
@@ -668,9 +663,7 @@ def _previous_answers(idx):
                 st.caption(sc["feedback"])
 
 
-# ---------------------------------------------------------------------------
 # Stage 4 — Report / Verdict
-# ---------------------------------------------------------------------------
 def report_stage():
     st.markdown(f"### {t('report_title')}")
 
@@ -692,13 +685,12 @@ def report_stage():
 
     report = st.session_state.report
 
-    # Save to candidate comparison store once.
     if not st.session_state.report_saved:
         storage.save_candidate(report)
         st.session_state.report_saved = True
-        storage.clear_resume()  # interview is complete
+        storage.clear_resume()  # interview is done
 
-    # Color-coded verdict banner (green / amber / red by score).
+    # Color-coded verdict banner
     sc10 = report.get("overall_score", 0)
     if sc10 >= 7:
         g1, g2 = "#10B981", "#059669"
@@ -793,9 +785,7 @@ def _download_buttons(report, md):
                            mime="text/markdown", use_container_width=True)
 
 
-# ---------------------------------------------------------------------------
 # Compare candidates
-# ---------------------------------------------------------------------------
 def compare_stage():
     st.markdown(f"### {t('compare_title')}")
     records = storage.list_candidates()
@@ -833,9 +823,6 @@ def compare_stage():
         st.rerun()
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 def main():
     init_state()
 
@@ -851,7 +838,6 @@ def main():
             st.rerun()
 
         st.divider()
-        # Persona: candidate (practice) vs interviewer (evaluate).
         persona_label = st.radio(
             t("persona"), [t("persona_candidate"), t("persona_interviewer")],
             index=0 if st.session_state.persona == "candidate" else 1)

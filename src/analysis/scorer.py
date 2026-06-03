@@ -4,6 +4,8 @@ Also flags answers that read as AI-generated / inauthentic vs. natural and
 personal, since a real interview rewards genuine, first-hand responses.
 """
 
+import re
+
 from src.core.llm_client import chat_json, chat_text, lang_directive
 from src.analysis.ai_detector import blend
 
@@ -15,6 +17,15 @@ _SYSTEM = (
     "answer and one that sounds generic or AI-generated."
 )
 
+_NON_ANSWER_PATTERNS = [
+    r"i\s*(do\s*not|don'?t|did\s*not|didn'?t)\s*know",
+    r"i\s*have\s*no\s*(idea|clue)",
+    r"no\s*idea", r"not\s*sure", r"i'?m\s*not\s*sure",
+    r"i\s*can'?t\s*answer", r"i\s*cannot\s*answer",
+    r"i\s*don'?t\s*remember", r"i\s*forgot",
+    r"^\s*(skip|pass|next|n/?a|none|nothing|idk|dunno|dk)\s*$",
+    r"^\s*(no|nope|nah)\s*$",
+]
 
 def score_answer(question, answer, job_direction, cv_analysis=None, context=None,
                  interview_lang="en"):
@@ -26,8 +37,7 @@ def score_answer(question, answer, job_direction, cv_analysis=None, context=None
     if not answer or not answer.strip():
         return _empty("No answer was provided.")
 
-    # Deterministic guard: a non-answer ("I don't know", "no idea", "pass"…)
-    # is always 0 — never send it to the model (avoids pity points + saves tokens).
+    # A non-answer ("I don't know", "no idea", "pass"…) is always 0 — never send it to the model
     if _is_non_answer(answer):
         return _non_answer_score()
 
@@ -106,6 +116,7 @@ Return ONLY the JSON object.{lang_directive(interview_lang)}"""
     try:
         # temperature=0 -> deterministic, consistent, reproducible scoring.
         data = chat_json(prompt, system=_SYSTEM, temperature=0.0)
+
     except Exception as err:
         return _empty(f"Could not evaluate answer: {err}")
 
@@ -118,16 +129,13 @@ def _normalise(data, answer=""):
     for key in ("relevance", "technical_accuracy", "clarity", "depth"):
         norm_crit[key] = _clamp10(crit.get(key, 0))
 
-    # Recompute overall from criteria so the displayed score is always
-    # consistent with the breakdown the candidate can see.
     overall = round(sum(norm_crit.values()) / 4, 1)
 
     for key in ("strengths", "weaknesses", "improvements", "authenticity_signals"):
         if not isinstance(data.get(key), list):
             data[key] = []
 
-    # --- Hybrid AI-detection: blend the model's judgement with local
-    # stylometric signals for a far more reliable, consistent verdict. ---
+    # AI-detection
     llm_ai = _clamp100(data.get("ai_likelihood", 50))
     ai, heur_signals = blend(llm_ai, answer)
     verdict = _verdict_from_ai(ai)
@@ -190,33 +198,16 @@ def _empty(message):
     }
 
 
-# Phrases that, when they make up essentially the whole answer, mean the
-# candidate gave no genuine attempt -> automatic 0 (not 1).
-_NON_ANSWER_PATTERNS = [
-    r"i\s*(do\s*not|don'?t|did\s*not|didn'?t)\s*know",
-    r"i\s*have\s*no\s*(idea|clue)",
-    r"no\s*idea", r"not\s*sure", r"i'?m\s*not\s*sure",
-    r"i\s*can'?t\s*answer", r"i\s*cannot\s*answer",
-    r"i\s*don'?t\s*remember", r"i\s*forgot",
-    r"^\s*(skip|pass|next|n/?a|none|nothing|idk|dunno|dk)\s*$",
-    r"^\s*(no|nope|nah)\s*$",
-]
-
-
 def _is_non_answer(answer):
     """True if the answer is essentially a non-answer / 'I don't know'."""
-    import re
     text = (answer or "").strip().lower()
     if len(text) < 2:
         return True
-    # Strip trailing punctuation for matching.
+
     core = re.sub(r"[\s\.\!\?\,]+$", "", text)
-    # Very short answers that are dominated by a non-answer phrase.
     for pat in _NON_ANSWER_PATTERNS:
         if re.search(pat, core):
-            # If the answer is short and matches, it's a non-answer. For longer
-            # answers, only treat as non-answer if the phrase IS basically the
-            # whole thing (e.g. "I don't know, sorry").
+            # If the answer is short
             if len(core.split()) <= 8:
                 return True
     return False
