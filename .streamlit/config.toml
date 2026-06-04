@@ -1,0 +1,15 @@
+# Professional theme — indigo/violet system.
+# Streamlit applies these to all native widgets; app.py layers refined CSS on top.
+[theme]
+base = "light"
+primaryColor = "#6366F1"            # Indigo 500 — primary actions / accents
+backgroundColor = "#F7F8FC"         # App canvas (cool off-white)
+secondaryBackgroundColor = "#FFFFFF" # Cards, sidebar, inputs
+textColor = "#0F172A"               # Slate 900 — high-contrast body text
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
