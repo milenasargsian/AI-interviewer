@@ -123,7 +123,8 @@ AI-interviewer/
 ├── app.py                      # Streamlit UI, flow controller, all 4 stages
 ├── requirements.txt         
 ├── README.md                   
-├── .env                    
+├── .env
+├── .streamlit/config.toml      # Theme
 └── src/
     ├── core/                   # Foundations
     │   ├── llm_client.py           # Groq gateway: chat, JSON mode, language, rate-limit fallback
