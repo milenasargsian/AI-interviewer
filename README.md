@@ -8,6 +8,8 @@ with problem-solving questions, scores every answer transparently, flags
 AI-generated answers, shows the ideal answer, and produces a graded, downloadable
 verdict.
 
+You can find the deployed app here: https://ai-interviewer-llm.streamlit.app/
+
 ---
 
 ## 1. What it does & who it's for
