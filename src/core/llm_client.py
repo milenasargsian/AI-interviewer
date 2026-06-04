@@ -13,6 +13,7 @@ from functools import lru_cache
 
 from dotenv import load_dotenv
 from groq import Groq
+import streamlit as st
 
 load_dotenv()
 load_dotenv("env")
@@ -28,7 +29,11 @@ MAX_CV_CHARS = int(os.getenv("MAX_CV_CHARS", "9000"))
 @lru_cache(maxsize=1)
 def get_client():
     """Return a cached Groq client, raising a clear error if unconfigured."""
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = (
+        st.secrets.get("GROQ_API_KEY")
+        if "GROQ_API_KEY" in st.secrets
+        else os.getenv("GROQ_API_KEY")
+    )
 
     if not api_key or "your_actual_api_key" in api_key:
         raise RuntimeError(
